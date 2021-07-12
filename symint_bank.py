@@ -8,16 +8,16 @@ def symh2geotrans(posn, posn1i, veln, veln1i, step):
         return xn1 - xn - 2.*mu*(xn1 + xn) - .5*h*(adn*cosh(arcsinh(xn)) + adn1*cosh(arcsinh(xn1)))
 
     def con2(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*sinh(arcsinh(xn))*sinh(arctanh(yn/zn)) + bdn*cosh(arctanh(yn/zn)) + adn1*sinh(arcsinh(xn1))*sinh(arctanh(yn1/zn1)) + bdn1*cosh(arctanh(yn1/zn1)))
+        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*sinh(arcsinh(xn))*sinh(arctanh(yn/zn)) + bdn*cosh(arctanh(yn/zn))/cosh(arcsinh(xn)) + adn1*sinh(arcsinh(xn1))*sinh(arctanh(yn1/zn1)) + bdn1*cosh(arctanh(yn1/zn1))/cosh(arcsinh(xn1)))
 
     def con3(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return zn1 - zn + 2.*mu*(zn1 + zn) - .5*h*(adn*sinh(arcsinh(xn))*cosh(arctanh(yn/zn)) + bdn*sinh(arctanh(yn/zn)) + adn1*sinh(arcsinh(xn1))*cosh(arctanh(yn1/zn1)) + bdn1*sinh(arctanh(yn1/zn1)))
+        return zn1 - zn + 2.*mu*(zn1 + zn) - .5*h*(adn*sinh(arcsinh(xn))*cosh(arctanh(yn/zn)) + bdn*sinh(arctanh(yn/zn))/cosh(arcsinh(xn)) + adn1*sinh(arcsinh(xn1))*cosh(arctanh(yn1/zn1)) + bdn1*sinh(arctanh(yn1/zn1))/cosh(arcsinh(xn1)))
 
     def con4(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return adn1 - adn - .5*h*(bdn*bdn*sinh(arcsinh(xn))*cosh(arcsinh(xn)) + bdn1*bdn1*sinh(arcsinh(xn1))*cosh(arcsinh(xn1)))
+        return adn1 - adn - .5*h*(bdn*bdn*sinh(arcsinh(xn))/cosh(arcsinh(xn)) + bdn1*bdn1*sinh(arcsinh(xn1))/cosh(arcsinh(xn1)))
 
     def con5(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(arcsinh(xn)) - 2.*adn1*bdn1*tanh(arcsinh(xn1)))
+        return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(arcsinh(xn))/cosh(arcsinh(xn)) - 2.*adn1*bdn1*tanh(arcsinh(xn1))/cosh(arcsinh(xn1)))
 
     def con6(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
         return xn1*xn1 + yn1*yn1 - zn1*zn1 + 1.
@@ -70,13 +70,13 @@ def imph2geotrans(posn, posn1i, veln, veln1i, step):
         return an1 - an - .5*h*(adn + adn1)
 
     def con2(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-        return bn1 - bn - .5*h*(bdn + bdn1)
+        return bn1 - bn - .5*h*(bdn/cosh(an) + bdn1/cosh(an1))
 
     def con3(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-        return adn1 - adn - .5*h*(bdn*bdn*sinh(an)*cosh(an) + bdn1*bdn1*sinh(an1)*cosh(an1))
+        return adn1 - adn - .5*h*(bdn*bdn*sinh(an)/cosh(an) + bdn1*bdn1*sinh(an1)/cosh(an1))
 
     def con4(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-        return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(an) - 2.*adn1*bdn1*tanh(an1))
+        return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(an)/cosh(an) - 2.*adn1*bdn1*tanh(an1)/cosh(an1))
     
     h = step
     mui = 10e-10
@@ -121,10 +121,10 @@ def imprk4h2geotrans(posn, veln, step):
         return bdn
 
     def afunc1(an, bn, adn, bdn): 
-        return bdn*bdn*sinh(an)*cosh(an)
+        return bdn*bdn*sinh(an)/cosh(an)
 
     def afunc2(an, bn, adn, bdn): 
-        return -2.*adn*bdn*tanh(an)
+        return -2.*adn*bdn*tanh(an)/cosh(an)
 
     k11=step*vfunc1(posn[0],posn[1],veln[0],veln[1])
     k21=step*vfunc2(posn[0],posn[1],veln[0],veln[1])
