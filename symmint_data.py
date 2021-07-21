@@ -1,4 +1,4 @@
-from symint_bank import symh2geotrans,imph2geotrans,imprk4h2geotrans,symh3geotrans,imph3geotrans,symh2xegeotrans,imph2xegeotrans,sympbhgeo,imppbhgeo,symh3cprot,imph3cprot,sympbhcp,imppbhcp,symh3sptrans,imph3sptrans
+from symint_bank import symh2geotrans,imph2geotrans,imprk4h2geotrans,symh2georot,imph2georot,symh3geotrans,imph3geotrans,symh2xegeotrans,imph2xegeotrans,sympbhgeo,imppbhgeo,symh3cprot,imph3cprot,sympbhcp,imppbhcp,symh3sptrans,imph3sptrans
 from function_bank import hyper2poin2d,hyper2poin3d,formatvec2d,unformatvec2d,formatvec3d,unformatvec3d,boostx2d,boosty2d,rotz2d,boostx3d,boosty3d,boostz3d,rotx3d,roty3d,rotz3d,motionmat2dh,motionmat3dh,py2dhfreetrans,xfunc2dhtrans,yfunc2dhtrans,zfunc2dhtrans,py3dhfreetrans,xfunc3dhtrans,yfunc3dhtrans,zfunc3dhtrans,wfunc3dhtrans,py3dhfreerot,xfunc3dhrot,yfunc3dhrot,zfunc3dhrot,wfunc3dhrot,py3dhgrav,py3dhefreetrans,xfunc3dhetrans,yfunc3dhetrans,zfunc3dhetrans,wfunc3dhetrans,py3dhefreerot,xfunc3dherot,yfunc3dherot,zfunc3dherot,wfunc3dherot,py3dhspring,py3dhespring
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -8,16 +8,16 @@ import numpy as np
 from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
 #Initial position (position in rotational / velocity in chosen parameterization)
-ai=0.
-bi=0.
-gi=1.
-adi=0.
+ai=.5
+bi=.0*np.pi/2.
+gi=0.
+adi=.0
 bdi=.5
 gdi=0. 
 massvec=array([10.,1.])
 sprcon=1.
 eqdist=1.
-version="h3geotrans"
+version="h2geoboth"
 plot="datatraj"
 delT=.01
 maxT=10+delT
@@ -39,9 +39,12 @@ gd2i=.5
 # Geodesic Trajectories
 
 if(version=="h2geotrans"):
-	#Do the process
+	# Do the process
 	ab = array([ai, bi])
-	posi = array([sinh(ab[0]), cosh(ab[0])*sinh(ab[1]), cosh(ab[0])*cosh(ab[1])])
+	# Position is given in rotational parameterization
+	posi = array([sinh(ab[0])*cos(ab[1]), sinh(ab[0])*sin(ab[1]), cosh(ab[0])])
+	# The implicit method requires the position to be in translational parameterization
+	abt = array([arcsinh(sinh(ab[0])*cos(ab[1])), arctanh(tanh(ab[0])*sin(ab[1]))])
 	posguess = posi
 	abdoti = array([adi, bdi])
 	abdotguess = abdoti
@@ -63,13 +66,13 @@ if(version=="h2geotrans"):
 	gx=append(gx, posi[0])
 	gy=append(gy, posi[1])
 	gz=append(gz, posi[2])
-	ga=append(ga, ab[0])
-	gb=append(gb, ab[1])
-	grk4a=append(grk4a, ab[0])
-	grk4b=append(grk4b, ab[1])	
+	ga=append(ga, abt[0])
+	gb=append(gb, abt[1])
+	grk4a=append(grk4a, abt[0])
+	grk4b=append(grk4b, abt[1])	
 	testm.append(symh2geotrans(posi, posguess, abdoti, abdotguess, delT))
-	testp.append(imph2geotrans(ab, ab, abdoti, abdotguess, delT))	
-	testprk4.append(imprk4h2geotrans(ab, abdoti, delT))		
+	testp.append(imph2geotrans(abt, abt, abdoti, abdotguess, delT))	
+	testprk4.append(imprk4h2geotrans(abt, abdoti, delT))		
 	gx=append(gx, testm[0][0][0])
 	gy=append(gy, testm[0][0][1])
 	gz=append(gz, testm[0][0][2])
@@ -116,8 +119,8 @@ if(version=="h2geotrans"):
 	checkhdata=[]
 	checkemdata=[]
 	for c in timearr:
-		checkhdata.append(hyper2poin2d(unformatvec2d(matmul(rotz2d(0),matmul(boosty2d(ab[1]),matmul(rotz2d(0),matmul(motionmat2dh(abdoti[0], abdoti[1], c),formatvec2d(array([0., 0., 1.])))))))))
-		checkemdata.append(unformatvec2d(matmul(rotz2d(0),matmul(boosty2d(ab[1]),matmul(rotz2d(0),matmul(motionmat2dh(abdoti[0], abdoti[1], c),formatvec2d(array([0., 0., 1.]))))))))
+		checkhdata.append(hyper2poin2d(unformatvec2d(matmul(rotz2d(ab[1]),matmul(boostx2d(ab[0]),matmul(rotz2d(-ab[1]),matmul(motionmat2dh(abdoti[0], abdoti[1], c),formatvec2d(array([0., 0., 1.])))))))))
+		checkemdata.append(unformatvec2d(matmul(rotz2d(ab[1]),matmul(boostx2d(ab[0]),matmul(rotz2d(-ab[1]),matmul(motionmat2dh(abdoti[0], abdoti[1], c),formatvec2d(array([0., 0., 1.]))))))))
 
 
 	#This formats the data to be compared with the integrator results
@@ -149,11 +152,12 @@ if(version=="h2geotrans"):
 		slemerr=[]
 		lpemerr=[]
 		pprk4emerr=[]		
+		# Using the Euclidean distance function to determine error in embedding space
 		for j in range(len(checku)):
-			spemerr.append(sqrt((gx[j]-sinh(ga[j]))**2. + (gy[j]-cosh(ga[j])*sinh(gb[j]))**2. - (gz[j]-cosh(ga[j])*cosh(gb[j]))**2.))
-			slemerr.append(sqrt((gx[j]-checkx[j])**2. + (gy[j]-checky[j])**2. - (gz[j]-checkz[j])**2.))
-			lpemerr.append(sqrt(abs((checkx[j]-sinh(ga[j]))**2. + (checky[j]-cosh(ga[j])*sinh(gb[j]))**2. - (checkz[j]-cosh(ga[j])*cosh(gb[j]))**2.)))
-			pprk4emerr.append(sqrt((sinh(grk4a[j])-sinh(ga[j]))**2. + (cosh(grk4a[j])*sinh(grk4b[j])-cosh(ga[j])*sinh(gb[j]))**2. - (cosh(grk4a[j])*cosh(grk4b[j])-cosh(ga[j])*cosh(gb[j]))**2.))		
+			spemerr.append(sqrt((gx[j]-sinh(ga[j]))**2. + (gy[j]-cosh(ga[j])*sinh(gb[j]))**2. + (gz[j]-cosh(ga[j])*cosh(gb[j]))**2.))
+			slemerr.append(sqrt((gx[j]-checkx[j])**2. + (gy[j]-checky[j])**2. + (gz[j]-checkz[j])**2.))
+			lpemerr.append(sqrt(abs((checkx[j]-sinh(ga[j]))**2. + (checky[j]-cosh(ga[j])*sinh(gb[j]))**2. + (checkz[j]-cosh(ga[j])*cosh(gb[j]))**2.)))
+			pprk4emerr.append(sqrt((sinh(grk4a[j])-sinh(ga[j]))**2. + (cosh(grk4a[j])*sinh(grk4b[j])-cosh(ga[j])*sinh(gb[j]))**2. + (cosh(grk4a[j])*cosh(grk4b[j])-cosh(ga[j])*cosh(gb[j]))**2.))		
 
 		#This is the particle trajectories in the Poincare model
 		    
@@ -165,14 +169,359 @@ if(version=="h2geotrans"):
 		plt.plot(gu,gv,label="sym")
 		plt.plot(gpu,gpv,label="parameter")
 		plt.plot(checku,checkv,label="lie")
-		# plt.plot(gprk4u,gprk4v,label="prk4")
+		#plt.plot(gprk4u,gprk4v,label="prk4")
 		plt.legend(loc='lower left')
 
 		plt.subplot(1,2,2)
 		plt.plot(timearr,spemerr,label="sym/par")
 		plt.plot(timearr,slemerr,label="sym/lie")
 		plt.plot(timearr,lpemerr,label="lie/par")
-		# plt.plot(timearr,pprk4emerr,label="prk4/par")		
+		#plt.plot(timearr,pprk4emerr,label="prk4/par")		
+		plt.legend(loc='upper left')		
+
+	elif(plot=="datasheet"):
+
+		#Differences
+
+		checksymu=[]
+		checkparu=[]
+		checkvalu=[]
+		checksymv=[]
+		checkparv=[]
+		checkvalv=[]
+		checker=0
+		for j in checku:
+			checksymu.append(abs(gu[checker]-j))
+			checkparu.append(abs(gpu[checker]-j))
+			checkvalu.append(abs(j-j))
+			checksymv.append(abs(gv[checker]-checkv[checker]))
+			checkparv.append(abs(gpv[checker]-checkv[checker]))
+			checkvalv.append(abs(checkv[checker]-checkv[checker]))	
+			checker=checker+1				
+
+		#This is for the horizon circle.
+		# Theta goes from 0 to 2pi
+		theta = np.linspace(0, 2*np.pi, 100)
+
+		# Compute x1 and x2 for horizon
+		xc = np.cos(theta)
+		yc = np.sin(theta) 	
+
+		fig = plt.figure(figsize=(15,8))
+		fig.suptitle("Controlling subplot sizes with width_ratios and height_ratios")
+
+		gs = gridspec.GridSpec(3, 4, width_ratios=[6, 2, 2, 2], height_ratios=[6, 2, 2])
+		ax1 = fig.add_subplot(gs[0])
+		ax1.set_aspect("equal")
+		ax1.set_xlabel('x', fontsize=12)
+		ax1.set_ylabel('y', fontsize=12)
+		ax1.set_title('Trajectory', fontsize=14)
+		ax1.plot(xc,yc)
+		ax1.plot(gu,gv, label='symmetric')
+		ax1.plot(checku,checkv, label='Lie')
+		ax1.plot(gpu,gpv, label='paramater')
+		ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2))
+		ax2 = fig.add_subplot(gs[5])
+		ax2.set_xlabel('x', fontsize=12)
+		ax2.set_ylabel('y', fontsize=12)
+		ax2.set_title('x coordinate', fontsize=14)
+		ax2.plot(timearr,gu, label='symmetric')
+		ax2.plot(timearr,checku, label='Lie')
+		ax2.plot(timearr,gpu, label='paramater')
+		ax2.legend(loc='upper center', bbox_to_anchor=(-.7, .9))	
+		ax3 = fig.add_subplot(gs[6])
+		ax3.set_xlabel('x', fontsize=12)
+		ax3.set_ylabel('y', fontsize=12)
+		ax3.set_title('y coordinate', fontsize=14)
+		ax3.plot(timearr,gv, label='symmetric')
+		ax3.plot(timearr,checkv, label='Lie')
+		ax3.plot(timearr,gpv, label='paramater')
+		ax5 = fig.add_subplot(gs[9])
+		ax5.set_xlabel('x', fontsize=12)
+		ax5.set_ylabel('y', fontsize=12)
+		ax5.set_title('x error', fontsize=14)
+		# ax5.plot(timearr,checksymu, label='symmetric vs. Lie')
+		# ax5.plot(timearr,checkvalu, label='Lie')
+		ax5.plot(timearr,checkparu, label='paramater vs. Lie')
+		ax5.legend(loc='upper center', bbox_to_anchor=(-.7, .9))
+		ax6 = fig.add_subplot(gs[10])
+		ax6.set_xlabel('x', fontsize=12)
+		ax6.set_ylabel('y', fontsize=12)
+		ax6.set_title('y error', fontsize=14)
+		# ax6.plot(timearr,checksymv, label='symmetric vs. Lie')
+		# ax6.plot(timearr,checkvalv, label='Lie')
+		ax6.plot(timearr,checkparv, label='paramater vs. Lie')
+
+	elif(plot=="datadiserror"):	
+
+		#Lie generator trajectories
+
+		checkerrdata=[]
+		for c in timearr:
+			checkerrdata.append(unformatvec2d(matmul(rotz2d(0),matmul(boosty2d(ab[1]),matmul(rotz2d(0),matmul(motionmat2dh(abdoti[0], abdoti[1], c),formatvec2d(array([0., 0., 1.]))))))))
+
+		#This formats the data to be compared with the integrator results
+
+		checkx = []
+		checky = []
+		checkz = []
+		for d in range(len(checku)):
+			checkx.append(checkerrdata[d][0])
+			checky.append(checkerrdata[d][1])
+			checkz.append(checkerrdata[d][2])		
+
+		spdiserr=[]
+		sldiserr=[]
+		lpdiserr=[]
+		for j in range(len(checku)):
+			spdiserr.append(arccosh(-gx[j]*sinh(ga[j])-gy[j]*cosh(ga[j])*sinh(gb[j])+gz[j]*cosh(ga[j])*cosh(gb[j])))
+			sldiserr.append(arccosh(-gx[j]*checkx[j]-gy[j]*checky[j]+gz[j]*checkz[j]))
+			lpdiserr.append(arccosh(-checkx[j]*sinh(ga[j])-checky[j]*cosh(ga[j])*sinh(gb[j])+checkz[j]*cosh(ga[j])*cosh(gb[j])))
+
+			# #Plot
+		fig= plt.figure(figsize=(5,5))
+
+		# plt.plot(timearr,spdiserr,label="sym/par")
+		# plt.plot(timearr,sldiserr,label="sym/lie")
+		plt.plot(timearr,lpdiserr,label="lie/par")
+		plt.legend()		
+
+	elif(plot=="dataemerror"):	
+
+		#Lie generator trajectories
+
+		checkerrdata=[]
+		for c in timearr:
+			checkerrdata.append(unformatvec2d(matmul(rotz2d(0),matmul(boosty2d(ab[1]),matmul(rotz2d(0),matmul(motionmat2dh(abdoti[0], abdoti[1], c),formatvec2d(array([0., 0., 1.]))))))))
+
+		#This formats the data to be compared with the integrator results
+
+		checkx = []
+		checky = []
+		checkz = []
+		for d in range(len(checku)):
+			checkx.append(checkerrdata[d][0])
+			checky.append(checkerrdata[d][1])
+			checkz.append(checkerrdata[d][2])		
+
+		spemerr=[]
+		slemerr=[]
+		lpemerr=[]
+		pprk4emerr=[]		
+		for j in range(len(checku)):
+			spemerr.append(sqrt((gx[j]-sinh(ga[j]))**2. + (gy[j]-cosh(ga[j])*sinh(gb[j]))**2. - (gz[j]-cosh(ga[j])*cosh(gb[j]))**2.))
+			slemerr.append(sqrt((gx[j]-checkx[j])**2. + (gy[j]-checky[j])**2. - (gz[j]-checkz[j])**2.))
+			lpemerr.append(sqrt((checkx[j]-sinh(ga[j]))**2. + (checky[j]-cosh(ga[j])*sinh(gb[j]))**2. - (checkz[j]-cosh(ga[j])*cosh(gb[j]))**2.))
+			pprk4emerr.append(sqrt((sinh(grk4a[j])-sinh(ga[j]))**2. + (cosh(grk4a[j])*sinh(grk4b[j])-cosh(ga[j])*sinh(gb[j]))**2. - (cosh(grk4a[j])*cosh(grk4b[j])-cosh(ga[j])*cosh(gb[j]))**2.))
+
+
+			# #Plot
+		fig= plt.figure(figsize=(5,5))
+
+		# plt.plot(timearr,spemerr,label="sym/par")
+		# plt.plot(timearr,slemerr,label="sym/lie")
+		# plt.plot(timearr,lpemerr,label="lie/par")
+		plt.plot(timearr,pprk4emerr,label="prk4/par")		
+		plt.legend()		
+
+	fig.tight_layout()	
+
+	plt.show()
+
+if(version=="h2geoboth"):
+	# Do the process for both parameterization at the same time to see how they compare
+	# Position is given in rotational parameterization
+	abri = array([ai, bi])
+	# Position in translational parameterization
+	abti = array([arcsinh(sinh(abri[0])*cos(abri[1])), arctanh(tanh(abri[0])*sin(abri[1]))])
+	posi = array([sinh(abri[0])*cos(abri[1]), sinh(abri[0])*sin(abri[1]), cosh(abri[0])])
+	posguess = posi
+	# Velocity given in translational parameterization
+	abdotti = array([adi, bdi])
+	# Velocity in rotational parameterization
+	abdotri = array([(abdotti[0]*sinh(abti[0])*cosh(abti[1]) + abdotti[1]*cosh(abti[0])*sinh(abti[1]))/sinh(abri[0]), (cos(abri[1])*(abdotti[0]*sinh(abti[0])*sinh(abti[1]) + abdotti[1]*cosh(abti[0])*cosh(abti[1])) - sin(abri[1])*(abdotti[0]*cosh(abti[0])))/sinh(abri[0])])
+	abdottguess = abdotti
+	abdotrguess = abdotri
+	nump=maxT/delT
+	timearr=np.arange(0,maxT,delT)
+
+	q = 0
+	testmt = []
+	gxt = []
+	gyt = []
+	gzt = []
+	testpt = []
+	gat = []
+	gbt = []
+
+	testmr = []
+	gxr = []
+	gyr = []
+	gzr = []
+	testpr = []
+	gar = []
+	gbr = []	
+
+	gxt=append(gxt, posi[0])
+	gyt=append(gyt, posi[1])
+	gzt=append(gzt, posi[2])
+	gat=append(gat, abti[0])
+	gbt=append(gbt, abti[1])
+	gxr=append(gxr, posi[0])
+	gyr=append(gyr, posi[1])
+	gzr=append(gzr, posi[2])
+	gar=append(gar, abri[0])
+	gbr=append(gbr, abri[1])
+
+	testmt.append(symh2geotrans(posi, posguess, abdotti, abdottguess, delT))
+	testpt.append(imph2geotrans(abti, abti, abdotti, abdottguess, delT))
+	testmr.append(symh2georot(posi, posguess, abdotri, abdotrguess, delT))
+	testpr.append(imph2georot(abri, abri, abdotri, abdotrguess, delT))		
+		
+	gxt=append(gxt, testmt[0][0][0])
+	gyt=append(gyt, testmt[0][0][1])
+	gzt=append(gzt, testmt[0][0][2])
+	gat=append(gat, testpt[0][0][0])
+	gbt=append(gbt, testpt[0][0][1])
+	gxr=append(gxr, testmr[0][0][0])
+	gyr=append(gyr, testmr[0][0][1])
+	gzr=append(gzr, testmr[0][0][2])
+	gar=append(gar, testpr[0][0][0])
+	gbr=append(gbr, testpr[0][0][1])
+	
+	q=q+1
+	while(q < nump-1):
+		nextposmt = array([testmt[q - 1][0][0], testmt[q - 1][0][1], testmt[q - 1][0][2]])
+		nextdotmt = array([testmt[q - 1][0][3], testmt[q - 1][0][4]])
+		nextpospt = array([testpt[q - 1][0][0], testpt[q - 1][0][1]])
+		nextdotpt = array([testpt[q - 1][0][2], testpt[q - 1][0][3]])
+		nextposmr = array([testmr[q - 1][0][0], testmr[q - 1][0][1], testmr[q - 1][0][2]])
+		nextdotmr = array([testmr[q - 1][0][3], testmr[q - 1][0][4]])
+		nextpospr = array([testpr[q - 1][0][0], testpr[q - 1][0][1]])
+		nextdotpr = array([testpr[q - 1][0][2], testpr[q - 1][0][3]])	
+
+		testmt.append(symh2geotrans(nextposmt, nextposmt, nextdotmt, nextdotmt, delT))
+		testpt.append(imph2geotrans(nextpospt, nextpospt, nextdotpt, nextdotpt, delT))
+		testmr.append(symh2georot(nextposmr, nextposmr, nextdotmr, nextdotmr, delT))
+		testpr.append(imph2georot(nextpospr, nextpospr, nextdotpr, nextdotpr, delT))
+		
+		gxt=append(gxt, testmt[q][0][0])
+		gyt=append(gyt, testmt[q][0][1])
+		gzt=append(gzt, testmt[q][0][2])
+		gat=append(gat, testpt[q][0][0])
+		gbt=append(gbt, testpt[q][0][1])
+		gxr=append(gxr, testmr[q][0][0])
+		gyr=append(gyr, testmr[q][0][1])
+		gzr=append(gzr, testmr[q][0][2])
+		gar=append(gar, testpr[q][0][0])
+		gbr=append(gbr, testpr[q][0][1])
+
+		q=q+1
+
+	gut=[]
+	gvt=[]
+	gput=[]
+	gpvt=[]
+	gur=[]
+	gvr=[]
+	gpur=[]
+	gpvr=[]
+	
+	for b in range(len(gxt)):
+	    gut=append(gut,gxt[b]/(gzt[b] + 1.))
+	    gvt=append(gvt,gyt[b]/(gzt[b] + 1.)) 
+	    gput=append(gput,sinh(gat[b])/(cosh(gat[b])*cosh(gbt[b]) + 1.))
+	    gpvt=append(gpvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b]) + 1.)) 
+	    gur=append(gur,gxr[b]/(gzr[b] + 1.))
+	    gvr=append(gvr,gyr[b]/(gzr[b] + 1.)) 
+	    gpur=append(gpur,sinh(gar[b])*cos(gbr[b])/(cosh(gar[b]) + 1.))
+	    gpvr=append(gpvr,sinh(gar[b])*sin(gbr[b])/(cosh(gar[b]) + 1.)) 	    	     
+
+	#Lie generator trajectories
+
+	checkhdata=[]
+	checkemdata=[]
+	liemag=array([sqrt(abdotti[0]**2. + cosh(abti[0])**2.*abdotti[1]**2.),0])
+	for c in timearr:
+
+		checkhdata.append(hyper2poin2d(unformatvec2d(matmul(rotz2d(abri[1]),matmul(boostx2d(abri[0]),matmul(rotz2d(-abri[1]),matmul(rotz2d(arctan2(abdotti[1], abdotti[0])),formatvec2d(array([sinh(liemag[0]*c), cosh(liemag[0]*c)*sinh(0.), cosh(liemag[0]*c)*cosh(0.)])))))))))
+		checkemdata.append(unformatvec2d(matmul(rotz2d(abri[1]),matmul(boostx2d(abri[0]),matmul(rotz2d(-abri[1]),matmul(rotz2d(arctan2(abdotti[1], abdotti[0])),formatvec2d(array([sinh(liemag[0]*c), cosh(liemag[0]*c)*sinh(0.), cosh(liemag[0]*c)*cosh(0.)]))))))))
+
+
+	#This formats the data to be compared with the integrator results
+
+	checku = []
+	checkv = []
+	checkx = []
+	checky = []
+	checkz = []	
+	for d in range(len(timearr)):
+		checku.append(checkhdata[d][0])
+		checkv.append(checkhdata[d][1])
+		checkx.append(checkemdata[d][0])
+		checky.append(checkemdata[d][1])
+		checkz.append(checkemdata[d][2])		
+
+	if(plot=="datatraj"):	
+
+
+		#This is for the horizon circle.
+		# Theta goes from 0 to 2pi
+		theta = np.linspace(0, 2*np.pi, 100)
+
+		# Compute x1 and x2 for horizon
+		xc = np.cos(theta)
+		yc = np.sin(theta)    		
+
+		sptemerr=[]
+		sltemerr=[]
+		lptemerr=[]
+		spremerr=[]
+		slremerr=[]
+		lpremerr=[]
+	
+		# Using the Euclidean distance function to determine error in embedding space
+		for j in range(len(checku)):
+			sptemerr.append(sqrt((gxt[j]-sinh(gat[j]))**2. + (gyt[j]-cosh(gat[j])*sinh(gbt[j]))**2. + (gzt[j]-cosh(gat[j])*cosh(gbt[j]))**2.))
+			sltemerr.append(sqrt((gxt[j]-checkx[j])**2. + (gyt[j]-checky[j])**2. + (gzt[j]-checkz[j])**2.))
+			lptemerr.append(sqrt(abs((checkx[j]-sinh(gat[j]))**2. + (checky[j]-cosh(gat[j])*sinh(gbt[j]))**2. + (checkz[j]-cosh(gat[j])*cosh(gbt[j]))**2.)))	
+			spremerr.append(sqrt((gxr[j]-sinh(gar[j])*cos(gbr[j]))**2. + (gyr[j]-sinh(gar[j])*sin(gbr[j]))**2. + (gzr[j]-cosh(gar[j]))**2.))
+			slremerr.append(sqrt((gxr[j]-checkx[j])**2. + (gyr[j]-checky[j])**2. + (gzr[j]-checkz[j])**2.))
+			lpremerr.append(sqrt(abs((checkx[j]-sinh(gar[j])*cos(gbr[j]))**2. + (checky[j]-sinh(gar[j])*sin(gbr[j]))**2. + (checkz[j]-cosh(gar[j]))**2.)))	
+
+		#This is the particle trajectories in the Poincare model
+		    
+		# #Plot
+		fig= plt.figure(figsize=(8,8))
+
+		plt.subplot(2,2,1)
+		plt.plot(xc,yc)
+		plt.plot(gut,gvt,label="sym T")
+		plt.plot(gput,gpvt,label="para T")
+		plt.plot(gur,gvr,label="sym R")
+		plt.plot(gpur,gpvr,label="para R")
+		plt.plot(checku,checkv,label="lie")
+		plt.legend(loc='lower left')
+
+		plt.subplot(2,2,2)
+		plt.plot(timearr,sptemerr,label="sym/par T")
+		plt.plot(timearr,sltemerr,label="sym/lie T")
+		plt.plot(timearr,lptemerr,label="lie/par T")
+		plt.plot(timearr,spremerr,label="sym/par R")
+		plt.plot(timearr,slremerr,label="sym/lie R")
+		plt.plot(timearr,lpremerr,label="lie/par R")	
+		plt.legend(loc='upper left')	
+
+		plt.subplot(2,2,3)
+		plt.plot(timearr,sptemerr,label="sym/par T")
+		plt.plot(timearr,sltemerr,label="sym/lie T")
+		plt.plot(timearr,lptemerr,label="lie/par T")	
+		plt.legend(loc='upper left')	
+
+		plt.subplot(2,2,4)
+		plt.plot(timearr,spremerr,label="sym/par R")
+		plt.plot(timearr,slremerr,label="sym/lie R")
+		plt.plot(timearr,lpremerr,label="lie/par R")	
 		plt.legend(loc='upper left')		
 
 	elif(plot=="datasheet"):
