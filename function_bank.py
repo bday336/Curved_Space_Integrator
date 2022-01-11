@@ -138,6 +138,14 @@ def motionmat3dh(v1, v2, v3, t):
 			[(v3*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v1*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v2*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1**2. + v2**2. + v3**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.)]
 		])
 
+# This is generate the exact trajectory for the H2 scipts to compare with integrator results (does not require the formating)
+def geodesicflow_x(t,v):
+    return array([
+        [cosh(t*v),0.,sinh(t*v)],
+        [0.,1.,0.],
+        [sinh(t*v),0.,cosh(t*v)]
+        ])
+
 
 #Functions for python integration algorithms
 

@@ -14,7 +14,7 @@ gi=0.
 adi=.0
 bdi=.0
 gdi=.5 
-delT=.01
+delT=.001
 maxT=10+delT
 
 

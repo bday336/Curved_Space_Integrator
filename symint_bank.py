@@ -81,8 +81,8 @@ def imph2geotrans(posn, posn1i, veln, veln1i, step):
     h = step
     mui = .01
     mat=array([
-        [1.,0.,0.,0.],
-        [0.,1.,0.,0.],
+        [1.,0.,-.5*h,0.],
+        [0.,1.,0.,-.5*h],
         [0.,0.,1.,0.],
         [0.,0.,0.,1.]
     ])
@@ -110,7 +110,7 @@ def imph2geotrans(posn, posn1i, veln, veln1i, step):
         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])        
         val1 = val2
         x=x+1
-    return[val1] 
+    return val1 
 
 def imprk4h2geotrans(posn, veln, step):
     

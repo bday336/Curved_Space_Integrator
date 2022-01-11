@@ -11,11 +11,11 @@ from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arcc
 ai=.25
 bi=np.pi/2.
 gi=0.
-adi=-.5
+adi=-.3
 bdi=.0
-gdi=.2 
+gdi=.5 
 delT=.01
-maxT=10+delT
+maxT=20+delT
 
 #Do the process
 abg = array([ai, bi, gi])
