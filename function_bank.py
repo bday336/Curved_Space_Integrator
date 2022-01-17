@@ -9,11 +9,14 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 
 # Convert from hyperboloid model to poincare model
 
-def hyper2poin2d(point): 
+def hyper2poinh2(point): 
 	return array([point[0]/(point[2] + 1.), point[1]/(point[2] + 1.)])
 
-def hyper2poin3d(point): 
+def hyper2poinh3(point): 
 	return array([point[0]/(point[3] + 1.), point[1]/(point[3] + 1.), point[2]/(point[3] + 1.)])
+
+def hyper2poinh2e(point): 
+	return array([point[0]/(point[3] + 1.), point[1]/(point[3] + 1.), point[2]])
 
 # Distance functions
 
@@ -23,64 +26,32 @@ def h2dist(point1,point2):
 def h3dist(point1,point2):
    return arccosh(-point1[0]*point2[0]-point1[1]*point2[1]-point1[2]*point2[2]+point1[3]*point2[3])
 
-# Convert position to be used with SO(n,1) matrices
+def h2edist(point1,point2):
+   return sqrt(arccosh(-point1[0]*point2[0]-point1[1]*point2[1]+point1[3]*point2[3])**2.+(point2[2]-point1[2])**2.)
 
-def formatvec2d(point): 
-	return array([point[2], point[0], point[1]])
+# SO(n,1) matrices (Format to act on vector like (x,y,z) or (x,y,z,w))
+# Only use boost in x direction
+# Need all applicable elements of SO(2/3)
 
-def unformatvec2d(point): 
-	return array([point[1], point[2], point[0]])
+# SO(2,1) -> For H2 isometries (x,y,z)
 
-def formatvec3d(point): 
-	return array([point[3], point[0], point[1], point[2]])
-
-def unformatvec3d(point): 
-	return array([point[1], point[2], point[3], point[0]])
-
-# SO(n,1) matrices
-
-# SO(2,1)
-
-def boostx2d(u): 
-	return array([
-	   [cosh(u), sinh(u), 0.],
-	   [sinh(u), cosh(u), 0.],
-	   [0., 0., 1.]
-		])
-
-def boosty2d(u): 
+def boostxh2(u): 
 	return array([
 	   [cosh(u), 0., sinh(u)],
-	   [0., 1., 0.],
+      [0., 1., 0.],
 	   [sinh(u), 0., cosh(u)]
 		])
 
-def rotz2d(u): 
+def rotzh2(u): 
 	return array([
-	   [1., 0., 0.],
-	   [0., cos(u), -sin(u)],
-	   [0., sin(u), cos(u)]
+	   [cos(u), -sin(u), 0.],
+	   [sin(u), cos(u), 0.],
+      [0., 0., 1.]
 		])
 
-# SO(3,1)   		
+# SO(3,1) -> For H3 isometries (x,y,z,w)
 
-def boostx3d(u): 
-	return array([
-	   [cosh(u), sinh(u), 0., 0.],
-	   [sinh(u), cosh(u), 0., 0.],
-	   [0., 0., 1., 0.],
-	   [0., 0., 0., 1.]
-		])
-
-def boosty3d(u): 
-	return array([
-	   [cosh(u), 0., sinh(u), 0.],
-	   [0., 1., 0., 0.],
-	   [sinh(u), 0., cosh(u), 0.],
-	   [0., 0., 0., 1.]
-		])
-
-def boostz3d(u): 
+def boostxh3(u): 
 	return array([
 	   [cosh(u), 0., 0., sinh(u)],
 	   [0., 1., 0., 0.],
@@ -88,290 +59,308 @@ def boostz3d(u):
 	   [sinh(u), 0., 0., cosh(u)]
 		])
 
-def rotx3d(u): 
-	return array([
-	   [1., 0., 0., 0.],
-	   [0., 1., 0., 0.],
-	   [0., 0., cos(u), -sin(u)],
-	   [0., 0., sin(u), cos(u)]
-		])
-
-def roty3d(u): 
-	return array([
-	   [1., 0., 0., 0.],
-	   [0., cos(u), 0., sin(u)],
-	   [0., 0., 1., 0.],
-	   [0., -sin(u), 0., cos(u)]
-		])
-
-def rotz3d(u): 
+def rotxh3(u): 
 	return array([
 	   [1., 0., 0., 0.],
 	   [0., cos(u), -sin(u), 0.],
 	   [0., sin(u), cos(u), 0.],
-	   [0., 0., 0., 1.]
+      [0., 0., 0., 1.]
 		])
 
-'''
-These are the matrix exponentials of Lie algebra generators for \
-translations.
-
-Translation generators for SO(2,1)
-{
-{0,v1*t,v2*t},
-{v1*t,0,0},
-{v2*t,0,0}
-}
-
-Translation generators for SO(3,1)
-{
-{0,v1*t,v2*t,v3*t},
-{v1*t,0,0,0},
-{v2*t,0,0,0},
-{v3*t,0,0,0}
-}
-'''
-def motionmat2dh(v1, v2, t): 
+def rotyh3(u): 
 	return array([
-		[cosh(t*sqrt(v1**2. + v2**2.)), (v1*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.), (v2*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.)], 
-			[(v1*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.), (v2**2. + v1**2.*cosh(t*sqrt(v1**2. + v2**2.)))/(v1**2. + v2**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2.))))/(v1**2. + v2**2.)], 
-			[(v2*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2.))))/(v1**2. + v2**2.), (v1**2. + v2**2.*cosh(t*sqrt(v1**2. + v2**2.)))/(v1**2. + v2**2.)]
-		])
+	   [cos(u), 0., sin(u), 0.],
+	   [0., 1., 0., 0.],
+	   [-sin(u), 0., cos(u), 0.],
+      [0., 0., 0., 1.]
+		])      
 
-def motionmat3dh(v1, v2, v3, t): 
+def rotzh3(u): 
 	return array([
-		[cosh(t*sqrt(v1**2. + v2**2. + v3**2.)), (v1*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v2*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v3*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.)], 
-			[(v1*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v2**2. + v3**2. + v1**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.)], 
-			[(v2*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1**2. + v3**2. + v2**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.), (v2*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.)], 
-			[(v3*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v1*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v2*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1**2. + v2**2. + v3**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.)]
+	   [cos(u), -sin(u), 0., 0.],
+	   [sin(u), cos(u), 0., 0.],
+      [0., 0., 1., 0.],
+      [0., 0., 0., 1.]
 		])
 
-# This is generate the exact trajectory for the H2 scipts to compare with integrator results (does not require the formating)
-def geodesicflow_x(t,v):
-    return array([
-        [cosh(t*v),0.,sinh(t*v)],
-        [0.,1.,0.],
-        [sinh(t*v),0.,cosh(t*v)]
-        ])
+# SO(2) X E(1) -> For H2E isometries (x,y,z,w)
+
+def transxzh2e(u,v):
+	return array([
+	   [cosh(u), 0., 0., sinh(u)],
+	   [0., 1., 0., 0.],
+	   [0., 0., v, 0.],
+	   [sinh(u), 0., 0., cosh(u)]
+		])    
+
+def rotzh2e(u): 
+	return array([
+	   [cos(u), -sin(u), 0., 0.],
+	   [sin(u), cos(u), 0., 0.],
+      [0., 0., 1., 0.],
+      [0., 0., 0., 1.]
+		])      
+
+# '''
+# These are the matrix exponentials of Lie algebra generators for \
+# translations.
+
+# Translation generators for SO(2,1)
+# {
+# {0,v1*t,v2*t},
+# {v1*t,0,0},
+# {v2*t,0,0}
+# }
+
+# Translation generators for SO(3,1)
+# {
+# {0,v1*t,v2*t,v3*t},
+# {v1*t,0,0,0},
+# {v2*t,0,0,0},
+# {v3*t,0,0,0}
+# }
+# '''
+# def motionmat2dh(v1, v2, t): 
+# 	return array([
+# 		[cosh(t*sqrt(v1**2. + v2**2.)), (v1*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.), (v2*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.)], 
+# 			[(v1*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.), (v2**2. + v1**2.*cosh(t*sqrt(v1**2. + v2**2.)))/(v1**2. + v2**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2.))))/(v1**2. + v2**2.)], 
+# 			[(v2*sinh(t*sqrt(v1**2. + v2**2.)))/sqrt(v1**2. + v2**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2.))))/(v1**2. + v2**2.), (v1**2. + v2**2.*cosh(t*sqrt(v1**2. + v2**2.)))/(v1**2. + v2**2.)]
+# 		])
+
+# def motionmat3dh(v1, v2, v3, t): 
+# 	return array([
+# 		[cosh(t*sqrt(v1**2. + v2**2. + v3**2.)), (v1*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v2*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v3*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.)], 
+# 			[(v1*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v2**2. + v3**2. + v1**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.)], 
+# 			[(v2*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v1*v2*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1**2. + v3**2. + v2**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.), (v2*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.)], 
+# 			[(v3*sinh(t*sqrt(v1**2. + v2**2. + v3**2.)))/sqrt(v1**2. + v2**2. + v3**2.), (v1*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v2*v3*(-1. + cosh(t*sqrt(v1**2. + v2**2. + v3**2.))))/(v1**2. + v2**2. + v3**2.), (v1**2. + v2**2. + v3**2.*cosh(t*sqrt(v1**2. + v2**2. + v3**2.)))/(v1**2. + v2**2. + v3**2.)]
+# 		])
+
+# # This is generate the exact trajectory for the H2 scipts to compare with integrator results (does not require the formating)
+# def geodesicflow_x(t,v):
+#     return array([
+#         [cosh(t*v),0.,sinh(t*v)],
+#         [0.,1.,0.],
+#         [sinh(t*v),0.,cosh(t*v)]
+#         ])
 
 
-#Functions for python integration algorithms
+# #Functions for python integration algorithms
 
-def py2dhfreetrans(indVars, t):
-	u, pu, v, pv = indVars
-	return [pu, (pv**2.)*sinh(u)*cosh(u), pv, -2.*pu*pv*tanh(u)]
+# def py2dhfreetrans(indVars, t):
+# 	u, pu, v, pv = indVars
+# 	return [pu, (pv**2.)*sinh(u)*cosh(u), pv, -2.*pu*pv*tanh(u)]
 
-def xfunc2dhtrans(u,v):
-	return sinh(u)
-def yfunc2dhtrans(u,v):
-	return cosh(u)*sinh(v)
-def zfunc2dhtrans(u,v):
-	return cosh(u)*cosh(v)	
+# def xfunc2dhtrans(u,v):
+# 	return sinh(u)
+# def yfunc2dhtrans(u,v):
+# 	return cosh(u)*sinh(v)
+# def zfunc2dhtrans(u,v):
+# 	return cosh(u)*cosh(v)	
 
-def py3dhfreetrans(indVars, t):
-	u, pu, v, pv, b, pb = indVars
-	return [pu, (cosh(v)*cosh(v)*(pb**2.)+(pv**2.))*sinh(u)*cosh(u), pv, sinh(v)*cosh(v)*(pb**2.)-2.*pu*pv*tanh(u), pb, -2.*pu*pb*tanh(u)-2.*pb*pv*tanh(v)]
+# def py3dhfreetrans(indVars, t):
+# 	u, pu, v, pv, b, pb = indVars
+# 	return [pu, (cosh(v)*cosh(v)*(pb**2.)+(pv**2.))*sinh(u)*cosh(u), pv, sinh(v)*cosh(v)*(pb**2.)-2.*pu*pv*tanh(u), pb, -2.*pu*pb*tanh(u)-2.*pb*pv*tanh(v)]
 
-def xfunc3dhtrans(u,v,b):
-	return sinh(u)
-def yfunc3dhtrans(u,v,b):
-	return cosh(u)*sinh(v)
-def zfunc3dhtrans(u,v,b):
-	return cosh(u)*cosh(v)*sinh(b)	
-def wfunc3dhtrans(u,v,b):
-	return cosh(u)*cosh(v)*cosh(b)	
+# def xfunc3dhtrans(u,v,b):
+# 	return sinh(u)
+# def yfunc3dhtrans(u,v,b):
+# 	return cosh(u)*sinh(v)
+# def zfunc3dhtrans(u,v,b):
+# 	return cosh(u)*cosh(v)*sinh(b)	
+# def wfunc3dhtrans(u,v,b):
+# 	return cosh(u)*cosh(v)*cosh(b)	
 
-def py3dhfreerot(indVars, t):
-	u, pu, v, pv, b, pb = indVars
-	return [pu, (sin(v)*sin(v)*(pb**2.)+(pv**2.))*sinh(u)*cosh(u), pv, sin(v)*cos(v)*(pb**2.)-2.*pu*pv*(1./tanh(u)), pb, -2.*pu*pb*(1./tanh(u))-2.*pb*pv*(1./tan(v))]
+# def py3dhfreerot(indVars, t):
+# 	u, pu, v, pv, b, pb = indVars
+# 	return [pu, (sin(v)*sin(v)*(pb**2.)+(pv**2.))*sinh(u)*cosh(u), pv, sin(v)*cos(v)*(pb**2.)-2.*pu*pv*(1./tanh(u)), pb, -2.*pu*pb*(1./tanh(u))-2.*pb*pv*(1./tan(v))]
 
-def xfunc3dhrot(u,v,b):
-	return sinh(u)*sin(v)*cos(b)
-def yfunc3dhrot(u,v,b):
-	return sinh(u)*sin(v)*sin(b)
-def zfunc3dhrot(u,v,b):
-	return sinh(u)*cos(v)
-def wfunc3dhrot(u,v,b):
-	return cosh(u)	
+# def xfunc3dhrot(u,v,b):
+# 	return sinh(u)*sin(v)*cos(b)
+# def yfunc3dhrot(u,v,b):
+# 	return sinh(u)*sin(v)*sin(b)
+# def zfunc3dhrot(u,v,b):
+# 	return sinh(u)*cos(v)
+# def wfunc3dhrot(u,v,b):
+# 	return cosh(u)	
 
-def py3dhgrav(indVars, t, sourcemass, testmass):
-	u, pu, v, pv, b, pb = indVars
-	return [pu, (sin(v)*sin(v)*(pb**2.)+(pv**2.))*sinh(u)*cosh(u)-(sourcemass*testmass)/(sinh(u)**2.), pv, sin(v)*cos(v)*(pb**2.)-2.*pu*pv*(1./tanh(u)), pb, -2.*pu*pb*(1./tanh(u))-2.*pb*pv*(1./tan(v))]
+# def py3dhgrav(indVars, t, sourcemass, testmass):
+# 	u, pu, v, pv, b, pb = indVars
+# 	return [pu, (sin(v)*sin(v)*(pb**2.)+(pv**2.))*sinh(u)*cosh(u)-(sourcemass*testmass)/(sinh(u)**2.), pv, sin(v)*cos(v)*(pb**2.)-2.*pu*pv*(1./tanh(u)), pb, -2.*pu*pb*(1./tanh(u))-2.*pb*pv*(1./tan(v))]
 
-def py3dhefreetrans(indVars, t):
-	u, pu, v, pv, b, pb = indVars
-	return [pu, (pv**2.)*sinh(u)*cosh(u), pv, -2.*pu*pv*tanh(u), pb, 0.]
+# def py3dhefreetrans(indVars, t):
+# 	u, pu, v, pv, b, pb = indVars
+# 	return [pu, (pv**2.)*sinh(u)*cosh(u), pv, -2.*pu*pv*tanh(u), pb, 0.]
 
-def xfunc3dhetrans(u,v,b):
-	return sinh(u)
-def yfunc3dhetrans(u,v,b):
-	return cosh(u)*sinh(v)
-def zfunc3dhetrans(u,v,b):
-	return b
-def wfunc3dhetrans(u,v,b):
-	return cosh(u)*cosh(v)
+# def xfunc3dhetrans(u,v,b):
+# 	return sinh(u)
+# def yfunc3dhetrans(u,v,b):
+# 	return cosh(u)*sinh(v)
+# def zfunc3dhetrans(u,v,b):
+# 	return b
+# def wfunc3dhetrans(u,v,b):
+# 	return cosh(u)*cosh(v)
 
-def py3dhefreerot(indVars, t):
-	u, pu, v, pv, b, pb = indVars
-	return [pu, (pv**2.)*sinh(u)*cosh(u), pv, -2.*pu*pv*(1./tanh(u)), pb, 0.]
+# def py3dhefreerot(indVars, t):
+# 	u, pu, v, pv, b, pb = indVars
+# 	return [pu, (pv**2.)*sinh(u)*cosh(u), pv, -2.*pu*pv*(1./tanh(u)), pb, 0.]
 
-def xfunc3dherot(u,v,b):
-	return sinh(u)*cos(v)
-def yfunc3dherot(u,v,b):
-	return sinh(u)*sin(v)
-def zfunc3dherot(u,v,b):
-	return b
-def wfunc3dherot(u,v,b):
-	return cosh(u)	
-
-
-def py3dhspring(indVars, t, k, xo, m1, m2):
-	u1, pu1, v1, pv1, b1, pb1, u2, pu2, v2, pv2, b2, pb2 = indVars
-	return [pu1,     (-(1./m1)*(-0.5*m1*(2.*pv1*pv1*cosh(u1)*sinh(u1) + 
-      2.*pb1*pb1*cosh(u1)*cosh(v1)**2.*sinh(u1)) + (k*(-xo + 
-        arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(cosh(b1)*cosh(b2)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(u1) - 
-        cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2)*sinh(u1) - cosh(u1)*sinh(u2) - 
-        cosh(u2)*sinh(u1)*sinh(v1)*sinh(v2)))/(sqrt(-1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv1,     (-(1./m1)*(1./cosh(u1)**2.)*(2.*m1*pu1*pv1*cosh(u1)*sinh(u1) - 
-   m1*pb1*pb1*cosh(u1)**2.*cosh(v1)*sinh(v1) + (k*(-xo + 
-        arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) - 
-        cosh(u1)*cosh(u2)*cosh(v2)*sinh(b1)*sinh(b2)*sinh(v1) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2)))/(sqrt(-1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb1,     (-(1./m1)*(1./cosh(u1)**2.)*(1./cosh(v1)**2.)*(2.*m1*pb1*pu1*cosh(u1)*cosh(v1)**2.*sinh(u1) + 
-   2.*m1*pb1*pv1*cosh(u1)**2.*cosh(v1)*sinh(v1) + (k*(-xo + 
-        arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1) - 
-        cosh(b1)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b2)))/(sqrt(-1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) -
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pu2,     (-(1./m2)*(-0.5*m2*(2.*pv2*pv2*cosh(u2)*sinh(u2) + 
-      2.*pb2*pb2*cosh(u2)*cosh(v2)**2.*sinh(u2)) + (k*(-xo + 
-        arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(-cosh(u2)*sinh(u1) + cosh(b1)*cosh(b2)*cosh(u1)*cosh(v1)*cosh(v2)*sinh(u2) - 
-        cosh(u1)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2)*sinh(u2) - cosh(u1)*sinh(u2)*sinh(v1)*sinh(v2)))/(sqrt(-1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv2,     (-(1./m2)*(1./cosh(u2)**2.)*(2.*m2*pu2*pv2*cosh(u2)*sinh(u2) - 
-   m2*pb2*pb2*cosh(u2)**2.*cosh(v2)*sinh(v2) + (k*(-xo + 
-        arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(-cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*sinh(b1)*sinh(b2)*sinh(v2)))/(sqrt(-1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb2,     (-(1/m2)*(1./cosh(u2)**2.)*(1./cosh(v2)**2.)*(2.*m2*pb2*pu2*cosh(u2)*cosh(v2)**2.*sinh(u2) + 
-   2.*m2*pb2*pv2*cosh(u2)**2.*cosh(v2)*sinh(v2) + (k*(-xo + 
-        arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(-cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1) + 
-        cosh(b1)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b2)))/(sqrt(-1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))))]
+# def xfunc3dherot(u,v,b):
+# 	return sinh(u)*cos(v)
+# def yfunc3dherot(u,v,b):
+# 	return sinh(u)*sin(v)
+# def zfunc3dherot(u,v,b):
+# 	return b
+# def wfunc3dherot(u,v,b):
+# 	return cosh(u)	
 
 
+# def py3dhspring(indVars, t, k, xo, m1, m2):
+# 	u1, pu1, v1, pv1, b1, pb1, u2, pu2, v2, pv2, b2, pb2 = indVars
+# 	return [pu1,     (-(1./m1)*(-0.5*m1*(2.*pv1*pv1*cosh(u1)*sinh(u1) + 
+#       2.*pb1*pb1*cosh(u1)*cosh(v1)**2.*sinh(u1)) + (k*(-xo + 
+#         arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(cosh(b1)*cosh(b2)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(u1) - 
+#         cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2)*sinh(u1) - cosh(u1)*sinh(u2) - 
+#         cosh(u2)*sinh(u1)*sinh(v1)*sinh(v2)))/(sqrt(-1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv1,     (-(1./m1)*(1./cosh(u1)**2.)*(2.*m1*pu1*pv1*cosh(u1)*sinh(u1) - 
+#    m1*pb1*pb1*cosh(u1)**2.*cosh(v1)*sinh(v1) + (k*(-xo + 
+#         arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) - 
+#         cosh(u1)*cosh(u2)*cosh(v2)*sinh(b1)*sinh(b2)*sinh(v1) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2)))/(sqrt(-1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb1,     (-(1./m1)*(1./cosh(u1)**2.)*(1./cosh(v1)**2.)*(2.*m1*pb1*pu1*cosh(u1)*cosh(v1)**2.*sinh(u1) + 
+#    2.*m1*pb1*pv1*cosh(u1)**2.*cosh(v1)*sinh(v1) + (k*(-xo + 
+#         arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1) - 
+#         cosh(b1)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b2)))/(sqrt(-1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) -
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pu2,     (-(1./m2)*(-0.5*m2*(2.*pv2*pv2*cosh(u2)*sinh(u2) + 
+#       2.*pb2*pb2*cosh(u2)*cosh(v2)**2.*sinh(u2)) + (k*(-xo + 
+#         arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(-cosh(u2)*sinh(u1) + cosh(b1)*cosh(b2)*cosh(u1)*cosh(v1)*cosh(v2)*sinh(u2) - 
+#         cosh(u1)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2)*sinh(u2) - cosh(u1)*sinh(u2)*sinh(v1)*sinh(v2)))/(sqrt(-1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv2,     (-(1./m2)*(1./cosh(u2)**2.)*(2.*m2*pu2*pv2*cosh(u2)*sinh(u2) - 
+#    m2*pb2*pb2*cosh(u2)**2.*cosh(v2)*sinh(v2) + (k*(-xo + 
+#         arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(-cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*sinh(b1)*sinh(b2)*sinh(v2)))/(sqrt(-1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb2,     (-(1/m2)*(1./cosh(u2)**2.)*(1./cosh(v2)**2.)*(2.*m2*pb2*pu2*cosh(u2)*cosh(v2)**2.*sinh(u2) + 
+#    2.*m2*pb2*pv2*cosh(u2)**2.*cosh(v2)*sinh(v2) + (k*(-xo + 
+#         arccosh(cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))*(-cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1) + 
+#         cosh(b1)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b2)))/(sqrt(-1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(b1)*cosh(b2)*cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2)*sinh(b1)*sinh(b2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2)))))]
 
-def py3dhespring(indVars, t, k, xo, m1, m2):
-	u1, pu1, v1, pv1, b1, pb1, u2, pu2, v2, pv2, b2, pb2 = indVars
-	return [pu1,     (-(1./m1)*(-m1*pv1*pv1*cosh(u1)*sinh(u1) + (k*arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(cosh(u2)*cosh(v1)*cosh(v2)*sinh(u1) - cosh(u1)*sinh(u2) - 
-        cosh(u2)*sinh(u1)*sinh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv1,     (-(1./m1)*(1./cosh(u1)**2.)*(2.*m1*pu1*pv1*cosh(u1)*sinh(u1) + (k*arccosh(
-       cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) - 
-        cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb1,     (((-b1 + b2)*k*(-xo + sqrt((-b1 + b2)**2. + 
-       arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)))/(m1*sqrt((-b1 + b2)**2. + 
-      	arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))), pu2,     (-(1./m2)*(-m2*pv2*pv2*cosh(u2)*sinh(u2) + (k*arccosh(
-       cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(-cosh(u2)*sinh(u1) + cosh(u1)*cosh(v1)*cosh(v2)*sinh(u2) - 
-        cosh(u1)*sinh(u2)*sinh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv2,     (-(1./m2)*(1./cosh(u2)**2.)*(2.*m2*pu2*pv2*cosh(u2)*sinh(u2) + (k*arccosh(
-       cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(-cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) + 
-        cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
-        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb2,     (-(((-b1 + b2)*k*(-xo + sqrt((-b1 + b2)**2. + 
-       arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)))/(m2*sqrt((-b1 + b2)**2. + 
-        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
-        sinh(u1)*sinh(u2) - 
-        cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))))]
+
+
+# def py3dhespring(indVars, t, k, xo, m1, m2):
+# 	u1, pu1, v1, pv1, b1, pb1, u2, pu2, v2, pv2, b2, pb2 = indVars
+# 	return [pu1,     (-(1./m1)*(-m1*pv1*pv1*cosh(u1)*sinh(u1) + (k*arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(cosh(u2)*cosh(v1)*cosh(v2)*sinh(u1) - cosh(u1)*sinh(u2) - 
+#         cosh(u2)*sinh(u1)*sinh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv1,     (-(1./m1)*(1./cosh(u1)**2.)*(2.*m1*pu1*pv1*cosh(u1)*sinh(u1) + (k*arccosh(
+#        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) - 
+#         cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb1,     (((-b1 + b2)*k*(-xo + sqrt((-b1 + b2)**2. + 
+#        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)))/(m1*sqrt((-b1 + b2)**2. + 
+#       	arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))), pu2,     (-(1./m2)*(-m2*pv2*pv2*cosh(u2)*sinh(u2) + (k*arccosh(
+#        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(-cosh(u2)*sinh(u1) + cosh(u1)*cosh(v1)*cosh(v2)*sinh(u2) - 
+#         cosh(u1)*sinh(u2)*sinh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pv2,     (-(1./m2)*(1./cosh(u2)**2.)*(2.*m2*pu2*pv2*cosh(u2)*sinh(u2) + (k*arccosh(
+#        cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*(-xo + sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))*(-cosh(u1)*cosh(u2)*cosh(v2)*sinh(v1) + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*sinh(v2)))/(sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)*sqrt(-1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))*sqrt(1. + 
+#         cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))))), pb2,     (-(((-b1 + b2)*k*(-xo + sqrt((-b1 + b2)**2. + 
+#        arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.)))/(m2*sqrt((-b1 + b2)**2. + 
+#         arccosh(cosh(u1)*cosh(u2)*cosh(v1)*cosh(v2) - 
+#         sinh(u1)*sinh(u2) - 
+#         cosh(u1)*cosh(u2)*sinh(v1)*sinh(v2))**2.))))]
 
 
 

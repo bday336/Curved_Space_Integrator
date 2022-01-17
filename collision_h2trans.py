@@ -1,5 +1,5 @@
 from symint_bank import imph2geotrans
-from function_bank import hyper2poin2d,hyper2poin3d,h2dist,formatvec2d,unformatvec2d,formatvec3d,unformatvec3d,boostx2d,boosty2d,rotz2d,boostx3d,boosty3d,boostz3d,rotx3d,roty3d,rotz3d,motionmat2dh,motionmat3dh,py2dhfreetrans,xfunc2dhtrans,yfunc2dhtrans,zfunc2dhtrans,py3dhfreetrans,xfunc3dhtrans,yfunc3dhtrans,zfunc3dhtrans,wfunc3dhtrans,py3dhfreerot,xfunc3dhrot,yfunc3dhrot,zfunc3dhrot,wfunc3dhrot,py3dhgrav,py3dhefreetrans,xfunc3dhetrans,yfunc3dhetrans,zfunc3dhetrans,wfunc3dhetrans,py3dhefreerot,xfunc3dherot,yfunc3dherot,zfunc3dherot,wfunc3dherot,py3dhspring,py3dhespring,geodesicflow_x
+from function_bank import hyper2poinh2,h2dist,boostxh2,rotzh2
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -20,50 +20,39 @@ def collision(pos1,pos2,vel1,vel2,mass1,mass2):
 	pos2hyp=array([sinh(pos2[0]),cosh(pos2[0])*sinh(pos2[1]),cosh(pos2[0])*cosh(pos2[1])])
 	vel1hyp=array([vel1[0]*cosh(pos1[0]),vel1[0]*sinh(pos1[0])*sinh(pos1[1])+vel1[1]*cosh(pos1[0])*cosh(pos1[1]),vel1[0]*sinh(pos1[0])*cosh(pos1[1])+vel1[1]*cosh(pos1[0])*sinh(pos1[1])])
 	vel2hyp=array([vel2[0]*cosh(pos2[0]),vel2[0]*sinh(pos2[0])*sinh(pos2[1])+vel2[1]*cosh(pos2[0])*cosh(pos2[1]),vel2[0]*sinh(pos2[0])*cosh(pos2[1])+vel2[1]*cosh(pos2[0])*sinh(pos2[1])])
-	trans12op1= unformatvec2d(rotz2d(arctan2(pos1hyp[1],pos1hyp[0])) @ boostx2d(-arccosh(pos1hyp[2])) @ rotz2d(-arctan2(pos1hyp[1],pos1hyp[0])) @ formatvec2d(pos1hyp))
-	trans12op2= unformatvec2d(rotz2d(arctan2(pos1hyp[1],pos1hyp[0])) @ boostx2d(-arccosh(pos1hyp[2])) @ rotz2d(-arctan2(pos1hyp[1],pos1hyp[0])) @ formatvec2d(pos2hyp))
-	trans12ov1= unformatvec2d(rotz2d(arctan2(pos1hyp[1],pos1hyp[0])) @ boostx2d(-arccosh(pos1hyp[2])) @ rotz2d(-arctan2(pos1hyp[1],pos1hyp[0])) @ formatvec2d(vel1hyp))
-	trans12ov2= unformatvec2d(rotz2d(arctan2(pos1hyp[1],pos1hyp[0])) @ boostx2d(-arccosh(pos1hyp[2])) @ rotz2d(-arctan2(pos1hyp[1],pos1hyp[0])) @ formatvec2d(vel2hyp))
-	trans22xp1= unformatvec2d(rotz2d(-arctan2(trans12op2[1],trans12op2[0])) @ formatvec2d(trans12op1))
-	trans22xp2= unformatvec2d(rotz2d(-arctan2(trans12op2[1],trans12op2[0])) @ formatvec2d(trans12op2))
-	trans22xv1= unformatvec2d(rotz2d(-arctan2(trans12op2[1],trans12op2[0])) @ formatvec2d(trans12ov1))
-	trans22xv2= unformatvec2d(rotz2d(-arctan2(trans12op2[1],trans12op2[0])) @ formatvec2d(trans12ov2))
-	transm2op1= unformatvec2d(boostx2d(-.5*dist) @ formatvec2d(trans22xp1))
-	transm2op2= unformatvec2d(boostx2d(-.5*dist) @ formatvec2d(trans22xp2))
-	transm2ov1= unformatvec2d(boostx2d(-.5*dist) @ formatvec2d(trans22xv1))
-	transm2ov2= unformatvec2d(boostx2d(-.5*dist) @ formatvec2d(trans22xv2))
-	transv2ov1= unformatvec2d(boostx2d(arccosh(transm2op1[2])) @ formatvec2d(transm2ov1))
-	transv2ov2= unformatvec2d(boostx2d(-arccosh(transm2op1[2])) @ formatvec2d(transm2ov2))
+	trans12op1= rotzh2(arctan2(pos1hyp[1],pos1hyp[0])) @ boostxh2(-arccosh(pos1hyp[2])) @ rotzh2(-arctan2(pos1hyp[1],pos1hyp[0])) @ pos1hyp
+	trans12op2= rotzh2(arctan2(pos1hyp[1],pos1hyp[0])) @ boostxh2(-arccosh(pos1hyp[2])) @ rotzh2(-arctan2(pos1hyp[1],pos1hyp[0])) @ pos2hyp
+	trans12ov1= rotzh2(arctan2(pos1hyp[1],pos1hyp[0])) @ boostxh2(-arccosh(pos1hyp[2])) @ rotzh2(-arctan2(pos1hyp[1],pos1hyp[0])) @ vel1hyp
+	trans12ov2= rotzh2(arctan2(pos1hyp[1],pos1hyp[0])) @ boostxh2(-arccosh(pos1hyp[2])) @ rotzh2(-arctan2(pos1hyp[1],pos1hyp[0])) @ vel2hyp
+	trans22xp1= rotzh2(-arctan2(trans12op2[1],trans12op2[0])) @ trans12op1
+	trans22xp2= rotzh2(-arctan2(trans12op2[1],trans12op2[0])) @ trans12op2
+	trans22xv1= rotzh2(-arctan2(trans12op2[1],trans12op2[0])) @ trans12ov1
+	trans22xv2= rotzh2(-arctan2(trans12op2[1],trans12op2[0])) @ trans12ov2
+	transm2op1= boostxh2(-.5*dist) @ trans22xp1
+	transm2op2= boostxh2(-.5*dist) @ trans22xp2
+	transm2ov1= boostxh2(-.5*dist) @ trans22xv1
+	transm2ov2= boostxh2(-.5*dist) @ trans22xv2
+	transv2ov1= boostxh2(arccosh(transm2op1[2])) @ transm2ov1
+	transv2ov2= boostxh2(-arccosh(transm2op1[2])) @ transm2ov2
 	postcolv1= array([transv2ov1[0]+2.*mass2/(mass1+mass2)*(transv2ov2[0]-transv2ov1[0]),transv2ov1[1],0])
 	postcolv2= array([transv2ov2[0]+2.*mass1/(mass1+mass2)*(transv2ov1[0]-transv2ov2[0]),transv2ov2[1],0])
-	newvel1= unformatvec2d(rotz2d(-arctan2(pos1hyp[1],pos1hyp[0])) @ boostx2d(arccosh(pos1hyp[2])) @ rotz2d(arctan2(pos1hyp[1],pos1hyp[0])) @ rotz2d(arctan2(trans12op2[1],trans12op2[0])) @ boostx2d(.5*dist) @  boostx2d(-arccosh(transm2op1[2])) @ formatvec2d(postcolv1))
-	newvel2= unformatvec2d(rotz2d(-arctan2(pos1hyp[1],pos1hyp[0])) @ boostx2d(arccosh(pos1hyp[2])) @ rotz2d(arctan2(pos1hyp[1],pos1hyp[0])) @ rotz2d(arctan2(trans12op2[1],trans12op2[0])) @ boostx2d(.5*dist) @ boostx2d(arccosh(transm2op1[2])) @ formatvec2d(postcolv2))
+	newvel1= rotzh2(-arctan2(pos1hyp[1],pos1hyp[0])) @ boostxh2(arccosh(pos1hyp[2])) @ rotzh2(arctan2(pos1hyp[1],pos1hyp[0])) @ rotzh2(arctan2(trans12op2[1],trans12op2[0])) @ boostxh2(.5*dist) @  boostxh2(-arccosh(transm2op1[2])) @ postcolv1
+	newvel2= rotzh2(-arctan2(pos1hyp[1],pos1hyp[0])) @ boostxh2(arccosh(pos1hyp[2])) @ rotzh2(arctan2(pos1hyp[1],pos1hyp[0])) @ rotzh2(arctan2(trans12op2[1],trans12op2[0])) @ boostxh2(.5*dist) @ boostxh2(arccosh(transm2op1[2])) @ postcolv2
 	newvelpara1= array([newvel1[0]/cosh(pos1[0]),(newvel1[1]*cosh(pos1[1])-newvel1[2]*sinh(pos1[1]))/cosh(pos1[0])])
 	newvelpara2= array([newvel2[0]/cosh(pos2[0]),(newvel2[1]*cosh(pos2[1])-newvel2[2]*sinh(pos2[1]))/cosh(pos2[0])])
 	return newvelpara1,newvelpara2
 
 # Plot the hyperbolic sphere
 def hypercirc(center,rad):
-	hyper2k=lambda vec : array([vec[0]/vec[2],vec[1]/vec[2],1./vec[2]])
-	hemi2upper=lambda vec : array([1,2.*vec[1]/(vec[0]+1.),2.*vec[2]/(vec[0]+1.)])
-	hyper2upper=lambda vec : hemi2upper(hyper2k(vec))
-	upper2hemi=lambda vec : 1./(4. + vec[1]**2. + vec[2]**2.)*array([(4. - vec[1]**2. - vec[2]**2.),(4.*vec[1]), (4.*vec[2])])
-	hemi2k=lambda vec : array([vec[0],vec[1],1.])
-	k2hyper=lambda vec : ((1. - vec[0]**2. - vec[1]**2.)**(-1./2.))*array([vec[0], vec[1], 1.])
-	upper2hyper=lambda vec : k2hyper(hemi2k(upper2hemi(vec)))
-
-	hcenter=hyper2upper(center)
-	hrad=rad
-
 	theta = np.linspace(0, 2*np.pi, 100)
 
-	xc = np.full(len(theta),1.)
-	yc = hcenter[2]*sinh(hrad)*cos(theta) + hcenter[1]
-	zc = hcenter[2]*sinh(hrad)*sin(theta) + hcenter[2]*cosh(hrad) 
+	xc = sinh(rad)*cos(theta)
+	yc = sinh(rad)*sin(theta)
+	zc = np.full(len(theta),cosh(rad))
 
 	circ_traj=array([])
 	for a in range(len(theta)):
-		circ_traj=append(circ_traj,hyper2poin2d(upper2hyper(array([xc[a],yc[a],zc[a]]))))
+		circ_traj=append(circ_traj,hyper2poinh2(rotzh2(arctan2(center[1],center[0])) @ boostxh2(arccosh(center[2])) @ array([xc[a],yc[a],zc[a]])))
 	return circ_traj[0::2],circ_traj[1::2]
 
 
