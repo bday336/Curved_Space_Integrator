@@ -8,14 +8,23 @@ import numpy as np
 from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
 #Initial position (position in rotational / velocity in chosen parameterization)
-ai=.5
+ai=.0
 bi=0.*np.pi/2.
 gi=0.
-adi=.0
-bdi=.5
-gdi=.0 
+adi=2.11584 #1.49427
+bdi=.0
+gdi=1 
 delT=.01
-maxT=10+delT
+maxT=1+delT
+
+# ai=.5
+# bi=0.*np.pi/2.
+# gi=0.
+# adi=.0
+# bdi=.5
+# gdi=.0 
+# delT=.01
+# maxT=10+delT
 
 
 #Do the process

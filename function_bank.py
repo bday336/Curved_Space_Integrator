@@ -15,10 +15,13 @@ def hyper2poin2d(point):
 def hyper2poin3d(point): 
 	return array([point[0]/(point[3] + 1.), point[1]/(point[3] + 1.), point[2]/(point[3] + 1.)])
 
-# Hyperbolic distance functions
+# Distance functions
 
 def h2dist(point1,point2):
    return arccosh(-point1[0]*point2[0]-point1[1]*point2[1]+point1[2]*point2[2])
+
+def h3dist(point1,point2):
+   return arccosh(-point1[0]*point2[0]-point1[1]*point2[1]-point1[2]*point2[2]+point1[3]*point2[3])
 
 # Convert position to be used with SO(n,1) matrices
 
