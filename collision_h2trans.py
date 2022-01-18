@@ -4,7 +4,6 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from matplotlib import animation, rc
-from scipy.integrate import odeint
 import numpy as np
 from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
@@ -42,7 +41,7 @@ def collision(pos1,pos2,vel1,vel2,mass1,mass2):
 	newvelpara2= array([newvel2[0]/cosh(pos2[0]),(newvel2[1]*cosh(pos2[1])-newvel2[2]*sinh(pos2[1]))/cosh(pos2[0])])
 	return newvelpara1,newvelpara2
 
-# Plot the hyperbolic sphere
+# Plot the hyperbolic 1-sphere
 def hypercirc(center,rad):
 	theta = np.linspace(0, 2*np.pi, 100)
 
@@ -167,10 +166,12 @@ x2 = []
 y2 = []
 
 # First set up the figure, the axis, and the plot element we want to animate
-fig, ax = plt.subplots(figsize=(5,5))
+fig, ax = plt.subplots(figsize=(6,6))
 
 ax.set_xlim([ -1, 1])
+ax.set_xlabel('X')
 ax.set_ylim([-1, 1])
+ax.set_ylabel('Y')
 
 ax.plot(xc,yc)
 part1x,part1y=hypercirc(array([sinh(gat[0::2][0]),cosh(gat[0::2][0])*sinh(gbt[0::2][0]),cosh(gat[0::2][0])*cosh(gbt[0::2][0])]),particles[0][5])
@@ -195,7 +196,7 @@ rc('animation', html='html5')
 # have changed.
 anim = animation.FuncAnimation(fig, animate,frames=frames, interval=50)
 
-anim.save('./animation.gif', writer='imagemagick')
+anim.save('./h2collision_test.gif', writer='imagemagick')
 
 
 
