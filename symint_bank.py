@@ -1,70 +1,28 @@
 from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arccos,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,linalg
+from function_bank import boostxh2e,h2dist,boostxh2,rotzh2,convertpos_hyp2paratransh2,convertvel_hyp2paratransh2
 
 # Hyperbolic 2-space Geodesics
 
-def symh2geotrans(posn, posn1i, veln, veln1i, step):
-    
-    def con1(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h):
-        return xn1 - xn - 2.*mu*(xn1 + xn) - .5*h*(adn*cosh(arcsinh(xn)) + adn1*cosh(arcsinh(xn1)))
+def imph2geotrans(posn, veln, step):
 
-    def con2(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*sinh(arcsinh(xn))*sinh(arctanh(yn/zn)) + bdn*cosh(arcsinh(xn))*cosh(arctanh(yn/zn)) + adn1*sinh(arcsinh(xn1))*sinh(arctanh(yn1/zn1)) + bdn1*cosh(arcsinh(xn1))*cosh(arctanh(yn1/zn1)))
+    # Condition the starting position to be at origin. This is done for computation simplification so as to make it more
+    # effective in the Javascript Ray-Marching visualization engine. For this simple case of generating geodesics we do not
+    # need this complicated infrastructure, I would say, since we have the isometry group, however I will include it for completeness.
+    # The physics engine will be leant on more heavy in the presence of potentials/collisions. 
+    # 
+    # There is also the issue of parallel transport in the case of doing the numerical integration which is not that important for 
+    # geodesic flow using the isometries since it implicitly takes care of it. The repositioning the starting position here to the 
+    # origin allows us ignore any complicating factors from parallel transport. If we treat the geodesic to be flowing along the 
+    # hyperboloid in the y direction (beta direction in the translational parameterization) the velocity vector remain constant in parameter 
+    # space (alpha/beta space) in both the directions thus we can treat it as if it is a connected tangent bundle along beta axis. 
+    # No extra parallel transport is needed in this case.
 
-    def con3(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return zn1 - zn + 2.*mu*(zn1 + zn) - .5*h*(adn*sinh(arcsinh(xn))*cosh(arctanh(yn/zn)) + bdn*cosh(arcsinh(xn))*sinh(arctanh(yn/zn)) + adn1*sinh(arcsinh(xn1))*cosh(arctanh(yn1/zn1)) + bdn1*cosh(arcsinh(xn1))*sinh(arctanh(yn1/zn1)))
+    # I have also updated the jacobian to be completely accurate, however given this repositioning of the system it is an
+    # unnecessary calculation since all correction terms are zero when flowing along beta axis (alpha=0). I will keep it
+    # for completeness, but could be dropped later for efficiency.
 
-    def con4(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return adn1 - adn - .5*h*(bdn*bdn*sinh(arcsinh(xn))*cosh(arcsinh(xn)) + bdn1*bdn1*sinh(arcsinh(xn1))*cosh(arcsinh(xn1)))
-
-    def con5(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(arcsinh(xn)) - 2.*adn1*bdn1*tanh(arcsinh(xn1)))
-
-    def con6(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return xn1*xn1 + yn1*yn1 - zn1*zn1 + 1.
-    
-    h = step
-    mui = .01
-    mat=array([
-        [1.,0.,0.,0.,0.,-4.*posn[0]],
-        [0.,1.,0.,0.,0.,-4.*posn[1]],
-        [0.,0.,1.,0.,0.,4.*posn[2]],
-        [0.,0.,0.,1.,0.,0.],                
-        [0.,0.,0.,0.,1.,0.],
-        [2.*posn[0],2.*posn[1],-2.*posn[2],0.,0.,0.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h)
-    ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], veln1i[0]+diff1[3], veln1i[1]+diff1[4], mui+diff1[5]])
-    x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,-4.*val1[0]],
-            [0.,1.,0.,0.,0.,-4.*val1[1]],
-            [0.,0.,1.,0.,0.,4.*val1[2]],
-            [0.,0.,0.,1.,0.,0.],                
-            [0.,0.,0.,0.,1.,0.],
-            [2.*val1[0],2.*val1[1],-2.*val1[2],0.,0.,0.]
-        ])
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h)
-        ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5]])        
-        val1 = val2
-        x=x+1
-    return[val1]
-
-def imph2geotrans(posn, posn1i, veln, veln1i, step):
+    # I have also updated the parameters this takes so that the first guess in the iteration process is the starting position
+    # and velocity for simplicity.
     
     def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -77,40 +35,142 @@ def imph2geotrans(posn, posn1i, veln, veln1i, step):
 
     def con4(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
         return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(an) - 2.*adn1*bdn1*tanh(an1))
+
+    def jacobian(an1, bn1, adn1, bdn1, h):
+        return array([
+                    [1.,0.,-.5*h,0.],
+                    [0.,1.,0.,-.5*h],
+                    [-.5*h*bdn1*bdn1*cosh(2*an1),0.,1.,-h*sinh(an1)*cosh(an1)*bdn1],
+                    [h*adn1*bdn1/(cosh(an1)*cosh(an1)),0.,h*tanh(an1)*bdn1,1.-h*tanh(an1)*adn1]
+                ])
+
+    # Convert to hyperboloid model for isometry operations
+
+    poshyp=array([
+        sinh(posn[0]),
+        cosh(posn[0])*sinh(posn[1]),
+        cosh(posn[0])*cosh(posn[1])])
+    velhyp=array([
+        veln[0]*cosh(posn[0]),
+        veln[0]*sinh(posn[0])*sinh(posn[1])+veln[1]*cosh(posn[0])*cosh(posn[1]),
+        veln[0]*sinh(posn[0])*cosh(posn[1])+veln[1]*cosh(posn[0])*sinh(posn[1])])
+    # print("Hyperboloid model position and velocity (Before)")
+    # print(poshyp,velhyp)
+    # print("")
     
-    h = step
-    mui = .01
-    mat=array([
-        [1.,0.,-.5*h,0.],
-        [0.,1.,0.,-.5*h],
-        [0.,0.,1.,0.],
-        [0.,0.,0.,1.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h)
+    # Reposition at the origin and reorient so that velocity is along the beta axis
+
+    pos2op=rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(-arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ poshyp
+    pos2ov=rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(-arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ velhyp
+    # print("Hyperboloid model position and velocity (at origin)")
+    # print(pos2op,pos2ov)
+    # print("")
+    pos2b=rotzh2(arctan2(pos2ov[0],pos2ov[1])) @ pos2op
+    vel2b=rotzh2(arctan2(pos2ov[0],pos2ov[1])) @ pos2ov
+    # print("Hyperboloid model position and velocity (at origin oriented along beta)")
+    # print(pos2b,vel2b)
+    # print("")
+
+    # Convert to translational parameterization for iterator
+    parapos=convertpos_hyp2paratransh2(pos2b)
+    paravel=convertvel_hyp2paratransh2(pos2b,vel2b)
+    # print("Parameterization position and velocity (Oriented along beta)")
+    # print(parapos,paravel)
+    # print("")
+
+    
+    diff1=linalg.solve(jacobian(parapos[0], parapos[1], paravel[0], paravel[1], step),-array([
+        con1(parapos[0], parapos[0], parapos[1], parapos[1], paravel[0], paravel[0], paravel[1], paravel[1], step),
+        con2(parapos[0], parapos[0], parapos[1], parapos[1], paravel[0], paravel[0], paravel[1], paravel[1], step),
+        con3(parapos[0], parapos[0], parapos[1], parapos[1], paravel[0], paravel[0], paravel[1], paravel[1], step),
+        con4(parapos[0], parapos[0], parapos[1], parapos[1], paravel[0], paravel[0], paravel[1], paravel[1], step)
     ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], veln1i[0]+diff1[2], veln1i[1]+diff1[3]])
+    val1 = array([parapos[0]+diff1[0], parapos[1]+diff1[1], paravel[0]+diff1[2], paravel[1]+diff1[3]])
     x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.],
-            [0.,1.,0.,0.],
-            [0.,0.,1.,0.],
-            [0.,0.,0.,1.]
-        ])        
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-            con2(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-            con3(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-            con4(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h)
+    while(x < 7):      
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], step),-array([
+            con1(parapos[0], val1[0], parapos[1], val1[1], paravel[0], val1[2], paravel[1], val1[3], step),
+            con2(parapos[0], val1[0], parapos[1], val1[1], paravel[0], val1[2], paravel[1], val1[3], step),
+            con3(parapos[0], val1[0], parapos[1], val1[1], paravel[0], val1[2], paravel[1], val1[3], step),
+            con4(parapos[0], val1[0], parapos[1], val1[1], paravel[0], val1[2], paravel[1], val1[3], step)
         ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])        
+        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])      
         val1 = val2
+        # print("val1")
+        # print(val1)
+        # print("")
         x=x+1
-    return val1 
+
+    # Convert to hyperboloid model for isometry operations
+    poshypnew=array([sinh(val1[0]),cosh(val1[0])*sinh(val1[1]),cosh(val1[0])*cosh(val1[1])])
+    velhypnew=array([val1[2]*cosh(val1[0]),val1[2]*sinh(val1[0])*sinh(val1[1])+val1[3]*cosh(val1[0])*cosh(val1[1]),val1[2]*sinh(val1[0])*cosh(val1[1])+val1[3]*cosh(val1[0])*sinh(val1[1])])
+    # print("Hyperboloid model position and velocity (after still oriented along beta)")
+    # print(poshypnew,velhypnew)
+    # print("")
+
+    # Reposition/reorient to start position
+    nextpos= rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ rotzh2(-arctan2(pos2ov[0],pos2ov[1])) @ poshypnew
+    nextvel= rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ rotzh2(-arctan2(pos2ov[0],pos2ov[1])) @ velhypnew
+    # print("Hyperboloid model position and velocity (back at start position)")
+    # print(nextpos,nextvel)
+    # print("")
+    # print("")
+
+    # Convert to translational parameterization
+    nextparapos=convertpos_hyp2paratransh2(nextpos)
+    nextparavel=convertvel_hyp2paratransh2(nextpos,nextvel)
+    
+    return array([nextparapos[0],nextparapos[1],nextparavel[0],nextparavel[1]]) 
+
+# This is the old version before trying to account for parallel transport
+# Also does not have a complete jacobian per the document I wrote up in overleaf
+# def imph2geotrans(posn, posn1i, veln, veln1i, step):
+    
+#     def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
+#         return an1 - an - .5*h*(adn + adn1)
+
+#     def con2(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
+#         return bn1 - bn - .5*h*(bdn + bdn1)
+
+#     def con3(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
+#         return adn1 - adn - .5*h*(bdn*bdn*sinh(an)*cosh(an) + bdn1*bdn1*sinh(an1)*cosh(an1))
+
+#     def con4(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
+#         return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(an) - 2.*adn1*bdn1*tanh(an1))
+    
+#     h = step
+#     mui = .01
+#     mat=array([
+#         [1.,0.,-.5*h,0.],
+#         [0.,1.,0.,-.5*h],
+#         [0.,0.,1.,0.],
+#         [0.,0.,0.,1.]
+#     ])
+#     diff1=linalg.solve(mat,-array([
+#         con1(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
+#         con2(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
+#         con3(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
+#         con4(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h)
+#     ]))
+#     val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], veln1i[0]+diff1[2], veln1i[1]+diff1[3]])
+#     x = 0
+#     while(x < 7):
+#         mat=array([
+#             [1.,0.,0.,0.],
+#             [0.,1.,0.,0.],
+#             [0.,0.,1.,0.],
+#             [0.,0.,0.,1.]
+#         ])        
+#         diff2=linalg.solve(mat,-array([
+#             con1(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
+#             con2(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
+#             con3(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
+#             con4(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h)
+#         ]))
+#         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])        
+#         val1 = val2
+#         x=x+1
+#     return val1 
 
 def imprk4h2geotrans(posn, veln, step):
     
