@@ -29,6 +29,17 @@ def h3dist(point1,point2):
 def h2edist(point1,point2):
    return sqrt(arccosh(-point1[0]*point2[0]-point1[1]*point2[1]+point1[3]*point2[3])**2.+(point2[2]-point1[2])**2.)
 
+# Distance functions
+
+def h2dot(point1,point2):
+   return point1[0]*point2[0]+point1[1]*point2[1]-point1[2]*point2[2]
+
+def h3dot(point1,point2):
+   return point1[0]*point2[0]+point1[1]*point2[1]+point1[2]*point2[2]-point1[3]*point2[3]
+
+def h2edot(point1,point2):
+   return point1[0]*point2[0]+point1[1]*point2[1]+point1[2]*point2[2]-point1[3]*point2[3]
+
 # SO(n,1) matrices (Format to act on vector like (x,y,z) or (x,y,z,w))
 # Only use boost in x direction
 # Need all applicable elements of SO(2/3)
@@ -85,13 +96,16 @@ def rotzh3(u):
 
 # SO(2) X E(1) -> For H2E isometries (x,y,z,w)
 
-def transxzh2e(u,v):
+def boostxh2e(u):
 	return array([
 	   [cosh(u), 0., 0., sinh(u)],
 	   [0., 1., 0., 0.],
-	   [0., 0., v, 0.],
+	   [0., 0., 1., 0.],
 	   [sinh(u), 0., 0., cosh(u)]
-		])    
+		])
+
+def transzh2e(u):
+	return array([0.,0.,u,0.])
 
 def rotzh2e(u): 
 	return array([

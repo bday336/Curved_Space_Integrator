@@ -616,7 +616,7 @@ def symh2xegeotrans(posn, posn1i, veln, veln1i, step):
         x=x+1
     return[val1]
 
-def imph2xegeotrans(posn, posn1i, veln, veln1i, step):
+def imph2egeotrans(posn, posn1i, veln, veln1i, step):
     
     def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -676,7 +676,7 @@ def imph2xegeotrans(posn, posn1i, veln, veln1i, step):
         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5]])        
         val1 = val2
         x=x+1
-    return[val1]
+    return val1
 
 def symh2xegeorot(posn, posn1i, veln, veln1i, step):
     
