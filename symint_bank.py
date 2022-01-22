@@ -23,6 +23,13 @@ def imph2geotrans(posn, veln, step):
 
     # I have also updated the parameters this takes so that the first guess in the iteration process is the starting position
     # and velocity for simplicity.
+
+    # UPDATE: So it seems that the introduction of my attempt at handling parallel transport has been unsuccessful. When comparing
+    # the error between a geodesic flow trajectory and the solver (with and without the parallel tranport added) the error is less
+    # without the transport addition. This is the case for both error in hyperbolic and euclidean distance for each point on the
+    # trajectory. It is interesting to notice that the odd resonance behavior I have seem in the solver without the transport
+    # does not exist when the transport is added. I suppose at this point we can continue to fudge the parallel transport of 
+    # vectors in the solver. I feel that this will need to be addressed at somepoint.
     
     def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -41,42 +48,47 @@ def imph2geotrans(posn, veln, step):
                     [1.,0.,-.5*h,0.],
                     [0.,1.,0.,-.5*h],
                     [-.5*h*bdn1*bdn1*cosh(2*an1),0.,1.,-h*sinh(an1)*cosh(an1)*bdn1],
-                    [h*adn1*bdn1/(cosh(an1)*cosh(an1)),0.,h*tanh(an1)*bdn1,1.-h*tanh(an1)*adn1]
+                    [h*adn1*bdn1/(cosh(an1)*cosh(an1)),0.,h*tanh(an1)*bdn1,1.+h*tanh(an1)*adn1]
                 ])
 
-    # Convert to hyperboloid model for isometry operations
+    # # Convert to hyperboloid model for isometry operations
 
-    poshyp=array([
-        sinh(posn[0]),
-        cosh(posn[0])*sinh(posn[1]),
-        cosh(posn[0])*cosh(posn[1])])
-    velhyp=array([
-        veln[0]*cosh(posn[0]),
-        veln[0]*sinh(posn[0])*sinh(posn[1])+veln[1]*cosh(posn[0])*cosh(posn[1]),
-        veln[0]*sinh(posn[0])*cosh(posn[1])+veln[1]*cosh(posn[0])*sinh(posn[1])])
-    # print("Hyperboloid model position and velocity (Before)")
-    # print(poshyp,velhyp)
-    # print("")
+    # poshyp=array([
+    #     sinh(posn[0]),
+    #     cosh(posn[0])*sinh(posn[1]),
+    #     cosh(posn[0])*cosh(posn[1])])
+    # velhyp=array([
+    #     veln[0]*cosh(posn[0]),
+    #     veln[0]*sinh(posn[0])*sinh(posn[1])+veln[1]*cosh(posn[0])*cosh(posn[1]),
+    #     veln[0]*sinh(posn[0])*cosh(posn[1])+veln[1]*cosh(posn[0])*sinh(posn[1])])
+    # # print("Hyperboloid model position and velocity (Before)")
+    # # print(poshyp,velhyp)
+    # # print("")
     
-    # Reposition at the origin and reorient so that velocity is along the beta axis
+    # # Reposition at the origin and reorient so that velocity is along the beta axis
 
-    pos2op=rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(-arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ poshyp
-    pos2ov=rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(-arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ velhyp
-    # print("Hyperboloid model position and velocity (at origin)")
-    # print(pos2op,pos2ov)
-    # print("")
-    pos2b=rotzh2(arctan2(pos2ov[0],pos2ov[1])) @ pos2op
-    vel2b=rotzh2(arctan2(pos2ov[0],pos2ov[1])) @ pos2ov
-    # print("Hyperboloid model position and velocity (at origin oriented along beta)")
-    # print(pos2b,vel2b)
-    # print("")
+    # pos2op=rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(-arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ poshyp
+    # pos2ov=rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(-arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ velhyp
+    # # print("Hyperboloid model position and velocity (at origin)")
+    # # print(pos2op,pos2ov)
+    # # print("")
+    # pos2b=rotzh2(arctan2(pos2ov[0],pos2ov[1])) @ pos2op
+    # vel2b=rotzh2(arctan2(pos2ov[0],pos2ov[1])) @ pos2ov
+    # # print("Hyperboloid model position and velocity (at origin oriented along beta)")
+    # # print(pos2b,vel2b)
+    # # print("")
 
-    # Convert to translational parameterization for iterator
-    parapos=convertpos_hyp2paratransh2(pos2b)
-    paravel=convertvel_hyp2paratransh2(pos2b,vel2b)
-    # print("Parameterization position and velocity (Oriented along beta)")
-    # print(parapos,paravel)
-    # print("")
+    # # Convert to translational parameterization for iterator
+    # parapos=convertpos_hyp2paratransh2(pos2b)
+    # paravel=convertvel_hyp2paratransh2(pos2b,vel2b)
+    # # print("Parameterization position and velocity (Oriented along beta)")
+    # # print(parapos,paravel)
+    # # print("")
+
+    parapos=posn
+    paravel=veln
+
+    # print(jacobian(parapos[0], parapos[1], paravel[0], paravel[1], step))
 
     
     diff1=linalg.solve(jacobian(parapos[0], parapos[1], paravel[0], paravel[1], step),-array([
@@ -88,6 +100,7 @@ def imph2geotrans(posn, veln, step):
     val1 = array([parapos[0]+diff1[0], parapos[1]+diff1[1], paravel[0]+diff1[2], paravel[1]+diff1[3]])
     x = 0
     while(x < 7):      
+        # print(jacobian(val1[0], val1[1], val1[2], val1[3], step))
         diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], step),-array([
             con1(parapos[0], val1[0], parapos[1], val1[1], paravel[0], val1[2], paravel[1], val1[3], step),
             con2(parapos[0], val1[0], parapos[1], val1[1], paravel[0], val1[2], paravel[1], val1[3], step),
@@ -101,26 +114,27 @@ def imph2geotrans(posn, veln, step):
         # print("")
         x=x+1
 
-    # Convert to hyperboloid model for isometry operations
-    poshypnew=array([sinh(val1[0]),cosh(val1[0])*sinh(val1[1]),cosh(val1[0])*cosh(val1[1])])
-    velhypnew=array([val1[2]*cosh(val1[0]),val1[2]*sinh(val1[0])*sinh(val1[1])+val1[3]*cosh(val1[0])*cosh(val1[1]),val1[2]*sinh(val1[0])*cosh(val1[1])+val1[3]*cosh(val1[0])*sinh(val1[1])])
-    # print("Hyperboloid model position and velocity (after still oriented along beta)")
-    # print(poshypnew,velhypnew)
-    # print("")
+    # # Convert to hyperboloid model for isometry operations
+    # poshypnew=array([sinh(val1[0]),cosh(val1[0])*sinh(val1[1]),cosh(val1[0])*cosh(val1[1])])
+    # velhypnew=array([val1[2]*cosh(val1[0]),val1[2]*sinh(val1[0])*sinh(val1[1])+val1[3]*cosh(val1[0])*cosh(val1[1]),val1[2]*sinh(val1[0])*cosh(val1[1])+val1[3]*cosh(val1[0])*sinh(val1[1])])
+    # # print("Hyperboloid model position and velocity (after still oriented along beta)")
+    # # print(poshypnew,velhypnew)
+    # # print("")
 
-    # Reposition/reorient to start position
-    nextpos= rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ rotzh2(-arctan2(pos2ov[0],pos2ov[1])) @ poshypnew
-    nextvel= rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ rotzh2(-arctan2(pos2ov[0],pos2ov[1])) @ velhypnew
-    # print("Hyperboloid model position and velocity (back at start position)")
-    # print(nextpos,nextvel)
-    # print("")
-    # print("")
+    # # Reposition/reorient to start position
+    # nextpos= rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ rotzh2(-arctan2(pos2ov[0],pos2ov[1])) @ poshypnew
+    # nextvel= rotzh2(arctan2(poshyp[1],poshyp[0])) @ boostxh2(arccosh(poshyp[2])) @ rotzh2(-arctan2(poshyp[1],poshyp[0])) @ rotzh2(-arctan2(pos2ov[0],pos2ov[1])) @ velhypnew
+    # # print("Hyperboloid model position and velocity (back at start position)")
+    # # print(nextpos,nextvel)
+    # # print("")
+    # # print("")
 
-    # Convert to translational parameterization
-    nextparapos=convertpos_hyp2paratransh2(nextpos)
-    nextparavel=convertvel_hyp2paratransh2(nextpos,nextvel)
+    # # Convert to translational parameterization
+    # nextparapos=convertpos_hyp2paratransh2(nextpos)
+    # nextparavel=convertvel_hyp2paratransh2(nextpos,nextvel)
     
-    return array([nextparapos[0],nextparapos[1],nextparavel[0],nextparavel[1]]) 
+    # return array([nextparapos[0],nextparapos[1],nextparavel[0],nextparavel[1]]) 
+    return val1
 
 # This is the old version before trying to account for parallel transport
 # Also does not have a complete jacobian per the document I wrote up in overleaf
