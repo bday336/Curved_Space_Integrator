@@ -1,5 +1,5 @@
-from symint_bank import imph2geotrans
-from function_bank import hyper2poinh2,h2dist,boostxh2,rotzh2,collisionh2,convert_rot2transh2,hypercirch2
+from symint_bank import imph2geotrans,imprk4h2geotrans
+from function_bank import hyper2poinh2,h2dist,boostxh2,rotzh2,convert_rot2transh2,hypercirch2
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -14,7 +14,7 @@ from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arcc
 
 #Initialize the particles in the simulation
 particles=array([
-    [0.,0.,.2,0.,1.,.2]        #particle 1
+    [.5,pi/2.,.1,.0,1.,.2]        #particle 1
     ])
 
 #Intialize the time stepping for the integrator.
@@ -42,7 +42,12 @@ gbt=append(gbt, positions[0][1])
 
 # Numerical Integration step
 step_data=array([
-	imph2geotrans(positions[0], velocities[0], delT)
+    # From testing the two methods it seems that both are of the same accuracy
+    # This leads me to wonder if we should just stick with the more straight forward 
+    # rk4 method if are are going to approximate the connected tangent bundle since the
+    # accuracy would be better than the second order
+	#imprk4h2geotrans(positions[0], velocities[0], delT) 
+    imph2geotrans(positions[0], velocities[0], delT)
 	])
 
 # Include the first time step
@@ -53,32 +58,43 @@ q=q+1
 
 # Iterate through each time step using data from the previous step in the trajectory
 while(q < nump-1):
-	# Collision detection check
-	dist=h2dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])])
-	if False: #dist<=particles[0][-1]+particles[1][-1]:
-		print("collided")
-		nextpos = array([step_data[0][:2], step_data[1][:2]])
-		nextdot= collisionh2(step_data[0][:2], step_data[1][:2],step_data[0][2:4], step_data[1][2:4],particles[0][4],particles[1][4])
-	else:
-		nextpos = array([step_data[0][:2]])
-		nextdot = array([step_data[0][2:4]])
+    nextpos = array([step_data[0][:2]])
+    nextdot = array([step_data[0][2:4]])
 
-	step_data=array([
-		imph2geotrans(nextpos[0], nextdot[0], delT)
-		])
+    step_data=array([
+        #imprk4h2geotrans(nextpos[0], nextdot[0], delT) 
+        imph2geotrans(nextpos[0], nextdot[0], delT)
+        ])
 
-	gat=append(gat, step_data[0][0])
-	gbt=append(gbt, step_data[0][1])
+    gat=append(gat, step_data[0][0])
+    gbt=append(gbt, step_data[0][1])
 
-	q=q+1
+    q=q+1
+
+# Generate geodesic flow to compare results
+checkdata=[]
+for c in timearr:
+    checkdata=append(checkdata,rotzh2(particles[0][1]) @ boostxh2(particles[0][0]) @ rotzh2(-particles[0][1]) @ array([sinh(velocities[0][0]*c),cosh(velocities[0][0]*c)*sinh(velocities[0][1]*c),cosh(velocities[0][0]*c)*cosh(velocities[0][1]*c)]))
+
+
+# Compare error between solver and geodesic flow
+errordatah2=[]
+errordatae3=[]
+for d in range(len(gat)):
+    # The hyperbolic distance error is modified so that even is the argument of the arccosh is less than 1 it still returns a none nan value
+    # Hence why i am taking the absolute value of the complex valued arccosh result (might not be the best solution but the values are so
+    # close to 1 in the argument I doubt it matters too much)
+    errordatah2=append(errordatah2,abs(arccosh(complex(-sinh(gat[d])*checkdata[0::3][d]-cosh(gat[d])*sinh(gbt[d])*checkdata[1::3][d]+cosh(gat[d])*cosh(gbt[d])*checkdata[2::3][d]))))
+    errordatae3=append(errordatae3,sqrt((sinh(gat[d])-checkdata[0::3][d])**2.+(cosh(gat[d])*sinh(gbt[d])-checkdata[1::3][d])**2.+(cosh(gat[d])*cosh(gbt[d])-checkdata[2::3][d])**2.))
 
 # Transform into Poincare disk model for plotting
 gut=[]
 gvt=[]
-
+checkplot=[]
 for b in range(len(gat)):
     gut=append(gut,sinh(gat[b])/(cosh(gat[b])*cosh(gbt[b]) + 1.))
-    gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b]) + 1.))	    	     		
+    gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b]) + 1.))
+    checkplot=append(checkplot,array([checkdata[0::3][b]/(checkdata[2::3][b] + 1.),checkdata[1::3][b]/(checkdata[2::3][b] + 1.)]))	    	     		
 
 #This is for the horizon circle.
 # Theta goes from 0 to 2pi
@@ -89,22 +105,64 @@ xc = np.cos(theta)
 yc = np.sin(theta)    		
 
 
+#####################
+#  PLOTTING SECTION #
+#####################
+
+# ------------------------------------------------------------------
+### Uncomment to just plot trajectory in the Poincare disk model ###
+# ------------------------------------------------------------------
+
 #This is the particle trajectories in the Poincare model
     
-#Plot
-plt.figure(figsize=(5,5))
+# #Plot
+# plt.figure(figsize=(5,5))
+
+# part1x,part1y=hypercirch2(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])]),particles[0][5])
+
+# plt.plot(xc,yc)
+# plt.plot(gut,gvt,label="solver")
+# plt.plot(checkplot[0::2],checkplot[1::2],label="geoflow")
+# plt.plot(part1x,part1y)
+# plt.legend(loc='lower left')	
+
+# plt.show()
+
+# -----------------------------------------------------------------------------------
+### Uncomment to just plot trajectory in the Poincare disk model with error plots ###
+# -----------------------------------------------------------------------------------
+
+
+# Plot Trajectory with error
+fig , ((ax1,ax2,ax3)) = plt.subplots(1,3,figsize=(12,4))
 
 part1x,part1y=hypercirch2(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])]),particles[0][5])
-# part2x,part2y=hypercirch2(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])]),particles[1][5])
 
-plt.plot(xc,yc)
-plt.plot(gut,gvt,label="particle 1")
-# plt.plot(gut[1::2],gvt[1::2],label="particle 2")
-plt.plot(part1x,part1y)
-#plt.plot(part2x,part2y)
-plt.legend(loc='lower left')	
+ax1.plot(xc,yc)
+ax1.plot(gut,gvt,label="solver")
+ax1.plot(checkplot[0::2],checkplot[1::2],label="geoflow")
+ax1.plot(part1x,part1y)
+ax1.set_xlabel('X')
+ax1.set_ylabel('Y')
+ax1.legend(loc='lower left')
+
+ax2.plot(timearr,errordatah2,label="h2 error")
+#ax2.set_yscale("log",basey=10)	
+ax2.set_xlabel('time (s)')
+ax2.legend(loc='lower right')	
+
+ax3.plot(timearr,errordatae3,label="e3 error")
+ax3.set_yscale("log",basey=10)
+ax3.set_xlabel('time (s)')	
+ax3.legend(loc='lower right')	
+
+fig.tight_layout()	
 
 plt.show()
+
+# ------------------------------------------------------------------
+### Uncomment to just generate gif of trajectory of the particle ###
+# ------------------------------------------------------------------
 
 # #Generate gif
 # # create empty lists for the x and y data
