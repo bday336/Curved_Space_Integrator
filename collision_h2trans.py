@@ -89,7 +89,16 @@ theta = np.linspace(0, 2*np.pi, 100)
 
 # Compute x1 and x2 for horizon
 xc = np.cos(theta)
-yc = np.sin(theta)    		
+yc = np.sin(theta)    
+
+
+#####################
+#  PLOTTING SECTION #
+#####################
+
+# --------------------------------------------------------------------
+### Uncomment to just plot trajectories in the Poincare disk model ###
+# --------------------------------------------------------------------
 
 
 #This is the particle trajectories in the Poincare model
@@ -108,6 +117,10 @@ plt.plot(part2x,part2y)
 plt.legend(loc='lower left')	
 
 plt.show()
+
+# ---------------------------------------------------------------------
+### Uncomment to just generate gif of trajectories of the particles ###
+# ---------------------------------------------------------------------
 
 # #Generate gif
 # # create empty lists for the x and y data

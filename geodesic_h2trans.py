@@ -45,7 +45,11 @@ step_data=array([
     # From testing the two methods it seems that both are of the same accuracy
     # This leads me to wonder if we should just stick with the more straight forward 
     # rk4 method if are are going to approximate the connected tangent bundle since the
-    # accuracy would be better than the second order
+    # accuracy would be better than the second order.
+
+    # WARNING - Cannot use the rk4 method presented here since we need to have time reversal
+    # which implies we need an implicit algorithm like the solver I have developed.
+
 	#imprk4h2geotrans(positions[0], velocities[0], delT) 
     imph2geotrans(positions[0], velocities[0], delT)
 	])
@@ -168,8 +172,6 @@ plt.show()
 # # create empty lists for the x and y data
 # x1 = []
 # y1 = []
-# x2 = []
-# y2 = []
 
 # # First set up the figure, the axis, and the plot element we want to animate
 # fig, ax = plt.subplots(figsize=(6,6))
@@ -180,20 +182,15 @@ plt.show()
 # ax.set_ylabel('Y')
 
 # ax.plot(xc,yc)
-# part1x,part1y=hypercirc(array([sinh(gat[0::2][0]),cosh(gat[0::2][0])*sinh(gbt[0::2][0]),cosh(gat[0::2][0])*cosh(gbt[0::2][0])]),particles[0][5])
-# part2x,part2y=hypercirc(array([sinh(gat[1::2][1]),cosh(gat[1::2][1])*sinh(gbt[1::2][1]),cosh(gat[1::2][1])*cosh(gbt[1::2][1])]),particles[1][5])
+# part1x,part1y=hypercirc(array([sinh(gat[0::1][0]),cosh(gat[0::1][0])*sinh(gbt[0::1][0]),cosh(gat[0::1][0])*cosh(gbt[0::1][0])]),particles[0][5])
 # circ1,=ax.plot(part1x,part1y)
-# circ2,=ax.plot(part2x,part2y)
 
 # # animation function. This is called sequentially
 # frames=50
 # def animate(i):
-# 	ax.plot(gut[0::2][:int(len(timearr)*i/frames)],gvt[0::2][:int(len(timearr)*i/frames)])
-# 	ax.plot(gut[1::2][:int(len(timearr)*i/frames)],gvt[1::2][:int(len(timearr)*i/frames)])
-# 	part1x,part1y=hypercirc(array([sinh(gat[0::2][int(len(timearr)*i/frames)]),cosh(gat[0::2][int(len(timearr)*i/frames)])*sinh(gbt[0::2][int(len(timearr)*i/frames)]),cosh(gat[0::2][int(len(timearr)*i/frames)])*cosh(gbt[0::2][int(len(timearr)*i/frames)])]),particles[0][5])
-# 	part2x,part2y=hypercirc(array([sinh(gat[1::2][int(len(timearr)*i/frames)]),cosh(gat[1::2][int(len(timearr)*i/frames)])*sinh(gbt[1::2][int(len(timearr)*i/frames)]),cosh(gat[1::2][int(len(timearr)*i/frames)])*cosh(gbt[1::2][int(len(timearr)*i/frames)])]),particles[1][5])
+# 	ax.plot(gut[0::1][:int(len(timearr)*i/frames)],gvt[0::1][:int(len(timearr)*i/frames)])
+# 	part1x,part1y=hypercirc(array([sinh(gat[0::1][int(len(timearr)*i/frames)]),cosh(gat[0::1][int(len(timearr)*i/frames)])*sinh(gbt[0::1][int(len(timearr)*i/frames)]),cosh(gat[0::1][int(len(timearr)*i/frames)])*cosh(gbt[0::1][int(len(timearr)*i/frames)])]),particles[0][5])
 # 	circ1.set_data([part1x],[part1y])
-# 	circ2.set_data([part2x],[part2y])
 
 # # equivalent to rcParams['animation.html'] = 'html5'
 # rc('animation', html='html5')

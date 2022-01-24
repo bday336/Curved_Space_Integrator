@@ -1,7 +1,25 @@
 from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arccos,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,linalg
 from function_bank import boostxh2e,h2dist,boostxh2,rotzh2,convertpos_hyp2paratransh2,convertvel_hyp2paratransh2
 
-# Hyperbolic 2-space Geodesics
+# This script is the repository of all the various solvers I have constructed
+# to run the physics engine of the VR Thurston geometry environments. Currently,
+# I have updated the solvers for geodesics in H2, H3, and H2xE. The collision
+# algorithm is also functional in these spaces for the case of geometric balls
+# in each space. There is also the solvers for the PBH space that we constructed
+# for an example of an isotropic and nonhomogenous space for the space.
+
+####################################
+### Hyperbolic 2-space Geodesics ###
+####################################
+
+# This is the workhorse algorithm for testing the solver in H2. In practice we would not
+# use the solver but rather use geodesic flow and the isometry group to generate motion
+# since it is more calculationally efficient I would say. This more about testing the
+# solver itself so that we have a base line on its effectiveness on generating the trajectories
+# we can compare with the exact results that are known. So far it seems that it is rather
+# effective at generating the correct geodesics. There does seem to be some resonance 
+# behavior in the E3 error compare with the exact trajectory, which I still am not sure
+# what the origin of it is.
 
 def imph2geotrans(posn, veln, step):
 
@@ -135,56 +153,59 @@ def imph2geotrans(posn, veln, step):
     
     # return array([nextparapos[0],nextparapos[1],nextparavel[0],nextparavel[1]]) 
     return val1
+ 
+# I haved updated the rotational parameterization method, however I have not
+# explicitly tested it. Updated the jacobian generation so that it is more
+# in line with how it should be in the algorithm for the solver. Will be
+# usefult to copy and paste when testing with central potential in 2D.
 
-# This is the old version before trying to account for parallel transport
-# Also does not have a complete jacobian per the document I wrote up in overleaf
-# def imph2geotrans(posn, posn1i, veln, veln1i, step):
+def imph2georot(posn, veln, step):
     
-#     def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
-#         return an1 - an - .5*h*(adn + adn1)
+    def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
+        return an1 - an - .5*h*(adn + adn1)
 
-#     def con2(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-#         return bn1 - bn - .5*h*(bdn + bdn1)
+    def con2(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
+        return bn1 - bn - .5*h*(bdn + bdn1)
 
-#     def con3(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-#         return adn1 - adn - .5*h*(bdn*bdn*sinh(an)*cosh(an) + bdn1*bdn1*sinh(an1)*cosh(an1))
+    def con3(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
+        return adn1 - adn - .5*h*(bdn*bdn*cosh(an)*sinh(an) + bdn1*bdn1*cosh(an1)*sinh(an1))
 
-#     def con4(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-#         return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(an) - 2.*adn1*bdn1*tanh(an1))
+    def con4(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
+        return bdn1 - bdn - .5*h*(-2.*adn*bdn/tanh(an) - 2.*adn1*bdn1/tanh(an1))
+
+    def jacobian(an1, bn1, adn1, bdn1, h):
+        return array([
+                    [1.,0.,-.5*h,0.],
+                    [0.,1.,0.,-.5*h],
+                    [-.5*h*bdn1*bdn1*cosh(2*an1),0.,1.,-h*sinh(an1)*cosh(an1)*bdn1],
+                    [-h*adn1*bdn1/(sinh(an1)*sinh(an1)),0.,h*bdn1/tanh(an1),1.+h*adn1/tanh(an1)]
+                ])
     
-#     h = step
-#     mui = .01
-#     mat=array([
-#         [1.,0.,-.5*h,0.],
-#         [0.,1.,0.,-.5*h],
-#         [0.,0.,1.,0.],
-#         [0.,0.,0.,1.]
-#     ])
-#     diff1=linalg.solve(mat,-array([
-#         con1(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-#         con2(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-#         con3(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-#         con4(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h)
-#     ]))
-#     val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], veln1i[0]+diff1[2], veln1i[1]+diff1[3]])
-#     x = 0
-#     while(x < 7):
-#         mat=array([
-#             [1.,0.,0.,0.],
-#             [0.,1.,0.,0.],
-#             [0.,0.,1.,0.],
-#             [0.,0.,0.,1.]
-#         ])        
-#         diff2=linalg.solve(mat,-array([
-#             con1(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-#             con2(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-#             con3(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-#             con4(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h)
-#         ]))
-#         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])        
-#         val1 = val2
-#         x=x+1
-#     return val1 
+
+    diff1=linalg.solve(jacobian(posn[0], posn[1], veln[0], veln[1], step),-array([
+        con1(posn[0], posn[0], posn[1], posn[1], veln[0], veln[0], veln[1], veln[1], step),
+        con2(posn[0], posn[0], posn[1], posn[1], veln[0], veln[0], veln[1], veln[1], step),
+        con3(posn[0], posn[0], posn[1], posn[1], veln[0], veln[0], veln[1], veln[1], step),
+        con4(posn[0], posn[0], posn[1], posn[1], veln[0], veln[0], veln[1], veln[1], step)
+    ]))
+    val1 = array([posn[0]+diff1[0], posn[1]+diff1[1], veln[0]+diff1[2], veln[1]+diff1[3]])
+    x = 0
+    while(x < 7):       
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], step),-array([
+            con1(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], step),
+            con2(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], step),
+            con3(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], step),
+            con4(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], step)
+        ]))
+        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])        
+        val1 = val2
+        x=x+1
+    return val1      
+
+# This method is included here for completeness, but it is NOT appropriate to use for the 
+# systems we are trying to model since we need an implicit method to ensure that we can 
+# preserve time reversal symmetry of the trajectories. So I will leave this here as a warning
+# to my future self in case I forget this feature.
 
 def imprk4h2geotrans(posn, veln, step):
     
@@ -222,197 +243,16 @@ def imprk4h2geotrans(posn, veln, step):
 
     val1=array([posn[0]+(k11+2.*k12+2.*k13+k14)/6.,posn[1]+(k21+2.*k22+2.*k23+k24)/6.,veln[0]+(k31+2.*k32+2.*k33+k34)/6.,veln[1]+(k41+2.*k42+2.*k43+k44)/6.])
 
-    return[val1]   
+    return val1  
 
-def symh2georot(posn, posn1i, veln, veln1i, step):
-    
-    def con1(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h):
-        return xn1 - xn - 2.*mu*(xn1 + xn) - .5*h*(adn*cosh(arccosh(zn))*cos(arctan2(yn,xn)) - bdn*sinh(arccosh(zn))*sin(arctan2(yn,xn)) + adn1*cosh(arccosh(zn1))*cos(arctan2(yn1,xn1)) - bdn1*sinh(arccosh(zn1))*sin(arctan2(yn1,xn1)))
+####################################
+### Hyperbolic 3-space Geodesics ###
+####################################
 
-    def con2(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*cosh(arccosh(zn))*sin(arctan2(yn,xn)) + bdn*sinh(arccosh(zn))*cos(arctan2(yn,xn)) + adn1*cosh(arccosh(zn1))*sin(arctan2(yn1,xn1)) + bdn1*sinh(arccosh(zn1))*cos(arctan2(yn1,xn1)))
+# This is the workhorse solver for H3. See the label for the H2 version for more
+# details.
 
-    def con3(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return zn1 - zn + 2.*mu*(zn1 + zn) - .5*h*(adn*sinh(arccosh(zn)) + adn1*sinh(arccosh(zn1)))
-
-    def con4(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return adn1 - adn - .5*h*(bdn*bdn*sinh(arccosh(zn))*cosh(arccosh(zn)) + bdn1*bdn1*sinh(arccosh(zn1))*cosh(arccosh(zn1)))
-
-    def con5(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return bdn1 - bdn - .5*h*(-2.*adn*bdn/tanh(arccosh(zn)) - 2.*adn1*bdn1/tanh(arccosh(zn1)))
-
-    def con6(xn, xn1, yn, yn1, zn, zn1, adn, adn1, bdn, bdn1, mu, h): 
-        return xn1*xn1 + yn1*yn1 - zn1*zn1 + 1.
-    
-    h = step
-    mui = .01
-    mat=array([
-        [1.,0.,0.,0.,0.,-4.*posn[0]],
-        [0.,1.,0.,0.,0.,-4.*posn[1]],
-        [0.,0.,1.,0.,0.,4.*posn[2]],
-        [0.,0.,0.,1.,0.,0.],                
-        [0.,0.,0.,0.,1.,0.],
-        [2.*posn[0],2.*posn[1],-2.*posn[2],0.,0.,0.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2],posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], mui, h)
-    ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], veln1i[0]+diff1[3], veln1i[1]+diff1[4], mui+diff1[5]])
-    x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,-4.*val1[0]],
-            [0.,1.,0.,0.,0.,-4.*val1[1]],
-            [0.,0.,1.,0.,0.,4.*val1[2]],
-            [0.,0.,0.,1.,0.,0.],                
-            [0.,0.,0.,0.,1.,0.],
-            [2.*val1[0],2.*val1[1],-2.*val1[2],0.,0.,0.]
-        ])
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], val1[5], h)
-        ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5]])        
-        val1 = val2
-        x=x+1
-    return[val1]
-
-def imph2georot(posn, posn1i, veln, veln1i, step):
-    
-    def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
-        return an1 - an - .5*h*(adn + adn1)
-
-    def con2(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-        return bn1 - bn - .5*h*(bdn + bdn1)
-
-    def con3(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-        return adn1 - adn - .5*h*(bdn*bdn*cosh(an)*sinh(an) + bdn1*bdn1*cosh(an1)*sinh(an1))
-
-    def con4(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h): 
-        return bdn1 - bdn - .5*h*(-2.*adn*bdn/tanh(an) - 2.*adn1*bdn1/tanh(an1))
-    
-    h = step
-    mui = .01
-    mat=array([
-        [1.,0.,0.,0.],
-        [0.,1.,0.,0.],
-        [0.,0.,1.,0.],
-        [0.,0.,0.,1.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], veln[0], veln1i[0], veln[1], veln1i[1], h)
-    ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], veln1i[0]+diff1[2], veln1i[1]+diff1[3]])
-    x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.],
-            [0.,1.,0.,0.],
-            [0.,0.,1.,0.],
-            [0.,0.,0.,1.]
-        ])        
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-            con2(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-            con3(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h),
-            con4(posn[0], val1[0], posn[1], val1[1], veln[0], val1[2], veln[1], val1[3], h)
-        ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3]])        
-        val1 = val2
-        x=x+1
-    return[val1]      
-
-# Hyperbolic 3-space Geodesics
-
-def symh3geotrans(posn, posn1i, veln, veln1i, step):
-    
-    def con1(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h):
-        return xn1 - xn - 2.*mu*(xn1 + xn) - .5*h*(adn*cosh(arcsinh(xn)) + adn1*cosh(arcsinh(xn1)))
-
-    def con2(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*sinh(arcsinh(xn))*sinh(arcsinh(yn/(cosh(arcsinh(xn))))) + bdn*cosh(arcsinh(xn))*cosh(arcsinh(yn/(cosh(arcsinh(xn))))) + adn1*sinh(arcsinh(xn1))*sinh(arcsinh(yn1/(cosh(arcsinh(xn1))))) + bdn1*cosh(arcsinh(xn1))*cosh(arcsinh(yn1/(cosh(arcsinh(xn1))))))
-
-    def con3(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return zn1 - zn - 2.*mu*(zn1 + zn) - .5*h*(adn*sinh(arcsinh(xn))*cosh(arcsinh(yn/(cosh(arcsinh(xn)))))*sinh(arctanh(zn/wn)) + bdn*cosh(arcsinh(xn))*sinh(arcsinh(yn/(cosh(arcsinh(xn)))))*sinh(arctanh(zn/wn)) + gdn*cosh(arcsinh(xn))*cosh(arcsinh(yn/(cosh(arcsinh(xn)))))*cosh(arctanh(zn/wn)) + adn1*sinh(arcsinh(xn1))*cosh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*sinh(arctanh(zn1/wn1)) + bdn1*cosh(arcsinh(xn1))*sinh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*sinh(arctanh(zn1/wn1)) + gdn1*cosh(arcsinh(xn1))*cosh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*cosh(arctanh(zn1/wn1)))
-
-    def con4(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return wn1 - wn + 2.*mu*(wn1 + wn) - .5*h*(adn*sinh(arcsinh(xn))*cosh(arcsinh(yn/(cosh(arcsinh(xn)))))*cosh(arctanh(zn/wn)) + bdn*cosh(arcsinh(xn))*sinh(arcsinh(yn/(cosh(arcsinh(xn)))))*cosh(arctanh(zn/wn)) + gdn*cosh(arcsinh(xn))*cosh(arcsinh(yn/(cosh(arcsinh(xn)))))*sinh(arctanh(zn/wn)) + adn1*sinh(arcsinh(xn1))*cosh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*cosh(arctanh(zn1/wn1)) + bdn1*cosh(arcsinh(xn1))*sinh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*cosh(arctanh(zn1/wn1)) + gdn1*cosh(arcsinh(xn1))*cosh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*sinh(arctanh(zn1/wn1)))    
-
-    def con5(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return adn1 - adn - .5*h*((bdn*bdn + gdn*gdn*cosh(arcsinh(yn/(cosh(arcsinh(xn)))))**2.)*sinh(arcsinh(xn))*cosh(arcsinh(xn)) + (bdn1*bdn1 + gdn1*gdn1*cosh(arcsinh(yn1/(cosh(arcsinh(xn1)))))**2.)*sinh(arcsinh(xn1))*cosh(arcsinh(xn1)))
-
-    def con6(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return bdn1 - bdn - .5*h*(gdn*gdn*sinh(arcsinh(yn/(cosh(arcsinh(xn)))))*cosh(arcsinh(yn/(cosh(arcsinh(xn))))) - 2.*adn*bdn*tanh(arcsinh(xn)) + gdn1*gdn1*sinh(arcsinh(yn1/(cosh(arcsinh(xn1)))))*cosh(arcsinh(yn1/(cosh(arcsinh(xn1))))) - 2.*adn1*bdn1*tanh(arcsinh(xn1)))
-
-    def con7(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return gdn1 - gdn - .5*h*(-2.*adn*gdn*tanh(arcsinh(xn)) - 2.*bdn*gdn*tanh(arcsinh(yn/(cosh(arcsinh(xn))))) - 2.*adn1*gdn1*tanh(arcsinh(xn1)) - 2.*bdn1*gdn1*tanh(arcsinh(yn1/(cosh(arcsinh(xn1))))))        
-
-    def con8(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return xn1*xn1 + yn1*yn1 + zn1*zn1 - wn1*wn1 + 1.
-    
-    h = step
-    mui = 10e-10
-    mat=array([
-        [1.,0.,0.,0.,0.,0.,0.,-4.*posn[0]],
-        [0.,1.,0.,0.,0.,0.,0.,-4.*posn[1]],
-        [0.,0.,1.,0.,0.,0.,0.,-4.*posn[2]],
-        [0.,0.,0.,1.,0.,0.,0.,4.*posn[3]],                
-        [0.,0.,0.,0.,1.,0.,0.,0.],
-        [0.,0.,0.,0.,0.,1.,0.,0.], 
-        [0.,0.,0.,0.,0.,0.,1.,0.],               
-        [2.*posn[0],2.*posn[1],2.*posn[2],-2.*posn[3],0.,0.,0.,0.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con7(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con8(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h)        
-    ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], posn1i[3]+diff1[3], veln1i[0]+diff1[4], veln1i[1]+diff1[5], veln1i[2]+diff1[6], mui+diff1[7]])
-    x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,0.,0.,-4.*val1[0]],
-            [0.,1.,0.,0.,0.,0.,0.,-4.*val1[1]],
-            [0.,0.,1.,0.,0.,0.,0.,-4.*val1[2]],
-            [0.,0.,0.,1.,0.,0.,0.,4.*val1[3]],                
-            [0.,0.,0.,0.,1.,0.,0.,0.],
-            [0.,0.,0.,0.,0.,1.,0.,0.], 
-            [0.,0.,0.,0.,0.,0.,1.,0.],               
-            [2.*val1[0],2.*val1[1],2.*val1[2],-2.*val1[3],0.,0.,0.,0.]
-        ])
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con7(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con8(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),            
-        ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5], val1[6]+diff2[6], val1[7]+diff2[7]])        
-        val1 = val2
-        x=x+1
-    return[val1]
-
-def imph3geotrans(posn, posn1i, veln, veln1i, step):
+def imph3geotrans(posn, veln, step):
     
     def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -430,127 +270,50 @@ def imph3geotrans(posn, posn1i, veln, veln1i, step):
         return bdn1 - bdn - .5*h*(gdn*gdn*sinh(bn)*cosh(bn) - 2.*adn*bdn*tanh(an) + gdn1*gdn1*sinh(bn1)*cosh(bn1) - 2.*adn1*bdn1*tanh(an1))
 
     def con6(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
-        return gdn1 - gdn - .5*h*(-2.*adn*gdn*tanh(an) - 2.*bdn*gdn*tanh(bn) - 2.*adn1*gdn1*tanh(an1) - 2.*bdn1*gdn1*tanh(bn1))         
-    
-    h = step
-    mui = 10e-10
-    mat=array([
-        [1.,0.,0.,0.,0.,0.],
-        [0.,1.,0.,0.,0.,0.],
-        [0.,0.,1.,0.,0.,0.],
-        [0.,0.,0.,1.,0.,0.],
-        [0.,0.,0.,0.,1.,0.],
-        [0.,0.,0.,0.,0.,1.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h)
+        return gdn1 - gdn - .5*h*(-2.*adn*gdn*tanh(an) - 2.*bdn*gdn*tanh(bn) - 2.*adn1*gdn1*tanh(an1) - 2.*bdn1*gdn1*tanh(bn1))  
+
+    def jacobian(an1, bn1, gn1, adn1, bdn1, gdn1, h):
+        return array([
+                    [1.,0.,0.,-.5*h,0.,0.],
+                    [0.,1.,0.,0.,-.5*h,0.],
+                    [0.,0.,1.,0.,0.,-.5*h],
+                    [-.5*h*(bdn1*bdn1+cosh(bn1)*cosh(bn1)*gdn1*gdn1)*cosh(2.*an1),-.25*h*sinh(2.*an1)*sinh(2.*bn1)*gdn1*gdn1,0.,1.,-.5*h*sinh(2.*an1)*bdn1,-.5*h*sinh(2.*an1)*cosh(bn1)*cosh(bn1)*gdn1],
+                    [h*adn1*bdn1/(cosh(an1)*cosh(an1)),-.5*h*cosh(2.*bn1)*gdn1*gdn1,0.,h*tanh(an1)*bdn1,1.+h*tanh(an1)*adn1,-.5*h*sinh(2.*bn1)*gdn1],
+                    [h*adn1*gdn1/(cosh(an1)*cosh(an1)),h*bdn1*gdn1/(cosh(bn1)*cosh(bn1)),0.,h*tanh(an1)*gdn1,h*tanh(bn1)*gdn1,1.+h*tanh(an1)*adn1+h*tanh(bn1)*bdn1]
+                ])           
+
+    diff1=linalg.solve(jacobian(posn[0], posn[1], posn[2], veln[0], veln[1], veln[2], step),-array([
+        con1(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con2(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con3(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con4(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con5(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con6(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step)
     ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], veln1i[0]+diff1[3], veln1i[1]+diff1[4], veln1i[2]+diff1[5]])
+    val1 = array([posn[0]+diff1[0], posn[1]+diff1[1], posn[2]+diff1[2], veln[0]+diff1[3], veln[1]+diff1[4], veln[2]+diff1[5]])
     x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,0.],
-            [0.,1.,0.,0.,0.,0.],
-            [0.,0.,1.,0.,0.,0.],
-            [0.,0.,0.,1.,0.,0.],
-            [0.,0.,0.,0.,1.,0.],
-            [0.,0.,0.,0.,0.,1.]
-        ])        
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h)
+    while(x < 7):       
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], val1[4], val1[5], step),-array([
+            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step)
         ]))
         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5]])        
         val1 = val2
         x=x+1
     return val1     
 
-def symh3georot(posn, posn1i, veln, veln1i, step):
-    
-    def con1(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h):
-        return xn1 - xn - 2.*mu*(xn1 + xn) - .5*h*(adn*cosh(arccosh(wn))*sin(arccos(zn/sinh(arccosh(wn))))*cos(arctan2(yn,xn)) + bdn*sinh(arccosh(wn))*cos(arccos(zn/sinh(arccosh(wn))))*cos(arctan2(yn,xn)) - gdn*sinh(arccosh(wn))*sin(arccos(zn/sinh(arccosh(wn))))*sin(arctan2(yn,xn)) + adn1*cosh(arccosh(wn1))*sin(arccos(zn1/sinh(arccosh(wn1))))*cos(arctan2(yn1,xn1)) + bdn1*sinh(arccosh(wn1))*cos(arccos(zn1/sinh(arccosh(wn1))))*cos(arctan2(yn1,xn1)) - gdn1*sinh(arccosh(wn1))*sin(arccos(zn1/sinh(arccosh(wn1))))*sin(arctan2(yn1,xn1)))
+# I haved updated the rotational parameterization method, however I have not
+# explicitly tested it. Updated the jacobian generation so that it is more
+# in line with how it should be in the algorithm for the solver. Will be
+# usefult to copy and paste when testing with central potential in 3D. Make
+# sure to check the jacobian function when using to make sure it is correct
+# just to double check.
 
-    def con2(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*cosh(arccosh(wn))*sin(arccos(zn/sinh(arccosh(wn))))*sin(arctan2(yn,xn)) + bdn*sinh(arccosh(wn))*cos(arccos(zn/sinh(arccosh(wn))))*sin(arctan2(yn,xn)) + gdn*sinh(arccosh(wn))*sin(arccos(zn/sinh(arccosh(wn))))*cos(arctan2(yn,xn)) + adn1*cosh(arccosh(wn1))*sin(arccos(zn1/sinh(arccosh(wn1))))*sin(arctan2(yn1,xn1)) + bdn1*sinh(arccosh(wn1))*cos(arccos(zn1/sinh(arccosh(wn1))))*sin(arctan2(yn1,xn1)) + gdn1*sinh(arccosh(wn1))*sin(arccos(zn1/sinh(arccosh(wn1))))*cos(arctan2(yn1,xn1)))
-
-    def con3(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return zn1 - zn - 2.*mu*(zn1 + zn) - .5*h*(adn*cosh(arccosh(wn))*cos(arccos(zn/sinh(arccosh(wn)))) - bdn*sinh(arccosh(wn))*sin(arccos(zn/sinh(arccosh(wn)))) + adn1*cosh(arccosh(wn1))*cos(arccos(zn1/sinh(arccosh(wn1)))) - bdn1*sinh(arccosh(wn1))*sin(arccos(zn1/sinh(arccosh(wn1)))))
-
-    def con4(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return wn1 - wn + 2.*mu*(wn1 + wn) - .5*h*(adn*sinh(arccosh(wn)) + adn1*sinh(arccosh(wn1)))    
-
-    def con5(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return adn1 - adn - .5*h*((bdn*bdn + gdn*gdn*sin(arccos(zn/sinh(arccosh(wn))))**2.)*sinh(arccosh(wn))*cosh(arccosh(wn)) + (bdn1*bdn1 + gdn1*gdn1*sin(arccos(zn1/sinh(arccosh(wn1))))**2.)*sinh(arccosh(wn1))*cosh(arccosh(wn1)))
-
-    def con6(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return bdn1 - bdn - .5*h*(gdn*gdn*sin(arccos(zn/sinh(arccosh(wn))))*cos(arccos(zn/sinh(arccosh(wn)))) - 2.*adn*bdn/tanh(arccosh(wn)) + gdn1*gdn1*sin(arccos(zn1/sinh(arccosh(wn1))))*cos(arccos(zn1/sinh(arccosh(wn1)))) - 2.*adn1*bdn1/tanh(arccosh(wn1)))
-
-    def con7(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return gdn1 - gdn - .5*h*(-2.*adn*gdn/tanh(arccosh(wn)) - 2.*bdn*gdn/tan(arccos(zn/sinh(arccosh(wn)))) - 2.*adn1*gdn1/tanh(arccosh(wn1)) - 2.*bdn1*gdn1/tan(arccos(zn1/sinh(arccosh(wn1)))))        
-
-    def con8(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return xn1*xn1 + yn1*yn1 + zn1*zn1 - wn1*wn1 + 1.
-    
-    h = step
-    mui = 10e-10
-    mat=array([
-        [1.,0.,0.,0.,0.,0.,0.,-4.*posn[0]],
-        [0.,1.,0.,0.,0.,0.,0.,-4.*posn[1]],
-        [0.,0.,1.,0.,0.,0.,0.,-4.*posn[2]],
-        [0.,0.,0.,1.,0.,0.,0.,4.*posn[3]],                
-        [0.,0.,0.,0.,1.,0.,0.,0.],
-        [0.,0.,0.,0.,0.,1.,0.,0.], 
-        [0.,0.,0.,0.,0.,0.,1.,0.],               
-        [2.*posn[0],2.*posn[1],2.*posn[2],-2.*posn[3],0.,0.,0.,0.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con7(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con8(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h)        
-    ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], posn1i[3]+diff1[3], veln1i[0]+diff1[4], veln1i[1]+diff1[5], veln1i[2]+diff1[6], mui+diff1[7]])
-    x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,0.,0.,-4.*val1[0]],
-            [0.,1.,0.,0.,0.,0.,0.,-4.*val1[1]],
-            [0.,0.,1.,0.,0.,0.,0.,-4.*val1[2]],
-            [0.,0.,0.,1.,0.,0.,0.,4.*val1[3]],                
-            [0.,0.,0.,0.,1.,0.,0.,0.],
-            [0.,0.,0.,0.,0.,1.,0.,0.], 
-            [0.,0.,0.,0.,0.,0.,1.,0.],               
-            [2.*val1[0],2.*val1[1],2.*val1[2],-2.*val1[3],0.,0.,0.,0.]
-        ])
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con7(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con8(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),            
-        ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5], val1[6]+diff2[6], val1[7]+diff2[7]])        
-        val1 = val2
-        x=x+1
-    return[val1]
-
-def imph3georot(posn, posn1i, veln, veln1i, step):
+def imph3georot(posn, veln, step):
     
     def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -569,126 +332,47 @@ def imph3georot(posn, posn1i, veln, veln1i, step):
 
     def con6(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
         return gdn1 - gdn - .5*h*(-2.*adn*gdn/tanh(an) - 2.*bdn*gdn/tan(bn) - 2.*adn1*gdn1/tanh(an1) - 2.*bdn1*gdn1/tan(bn1))
-    
-    h = step
-    mui = 10e-10
-    mat=array([
-        [1.,0.,0.,0.,0.,0.],
-        [0.,1.,0.,0.,0.,0.],
-        [0.,0.,1.,0.,0.,0.],
-        [0.,0.,0.,1.,0.,0.],
-        [0.,0.,0.,0.,1.,0.],
-        [0.,0.,0.,0.,0.,1.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h)
+
+    def jacobian(an1, bn1, gn1, adn1, bdn1, gdn1, h):
+        return array([
+                [1.,0.,0.,-.5*h,0.,0.],
+                [0.,1.,0.,0.,-.5*h,0.],
+                [0.,0.,1.,0.,0.,-.5*h],
+                [-.5*h*(bdn1*bdn1+sin(bn1)*sin(bn1)*gdn1*gdn1)*cosh(2.*an1),-.25*h*sinh(2.*an1)*sin(2.*bn1)*gdn1*gdn1,0.,1.,-.5*h*sinh(2.*an1)*bdn1,-.5*h*sinh(2.*an1)*sin(bn1)*sin(bn1)*gdn1],
+                [-h*adn1*bdn1/(sinh(an1)*sinh(an1)),-.5*h*cos(2.*bn1)*gdn1*gdn1,0.,h*bdn1/tanh(an1),1.+h*adn1/tanh(an1),-.5*h*sin(2.*bn1)*gdn1],
+                [-h*adn1*gdn1/(sinh(an1)*sinh(an1)),-h*bdn1*gdn1/(sin(bn1)*sin(bn1)),0.,h*gdn1/tanh(an1),h*gdn1/tan(bn1),1.+h*adn1/tanh(an1)+h*bdn1/tan(bn1)]
+            ])     
+
+    diff1=linalg.solve(jacobian(posn[0], posn[1], posn[2], veln[0], veln[1], veln[2], step),-array([
+        con1(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con2(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con3(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con4(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con5(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con6(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step)
     ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], veln1i[0]+diff1[3], veln1i[1]+diff1[4], veln1i[2]+diff1[5]])
+    val1 = array([posn[0]+diff1[0], posn[1]+diff1[1], posn[2]+diff1[2], veln[0]+diff1[3], veln[1]+diff1[4], veln[2]+diff1[5]])
     x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,0.],
-            [0.,1.,0.,0.,0.,0.],
-            [0.,0.,1.,0.,0.,0.],
-            [0.,0.,0.,1.,0.,0.],
-            [0.,0.,0.,0.,1.,0.],
-            [0.,0.,0.,0.,0.,1.]
-        ])        
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h)
+    while(x < 7):       
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], val1[4], val1[5], step),-array([
+            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step)
         ]))
         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5]])        
         val1 = val2
         x=x+1
-    return[val1] 
+    return val1 
 
-# H2xE 3-space Geodesics
+##############################
+### H2xE 3-space Geodesics ###
+##############################
 
-def symh2xegeotrans(posn, posn1i, veln, veln1i, step):
-    
-    def con1(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h):
-        return xn1 - xn - 2.*mu*(xn1 + xn) - .5*h*(adn*cosh(arcsinh(xn)) + adn1*cosh(arcsinh(xn1)))
-
-    def con2(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return yn1 - yn - 2.*mu*(yn1 + yn) - .5*h*(adn*sinh(arcsinh(xn))*sinh(arctanh(yn/wn)) + bdn*cosh(arcsinh(xn))*cosh(arctanh(yn/wn)) + adn1*sinh(arcsinh(xn1))*sinh(arctanh(yn1/wn1)) + bdn1*cosh(arcsinh(xn1))*cosh(arctanh(yn1/wn1)))
-
-    def con3(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return zn1 - zn - .5*h*(gdn+gdn1)
-
-    def con4(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return wn1 - wn + 2.*mu*(wn1 + wn) - .5*h*(adn*sinh(arcsinh(xn))*cosh(arctanh(yn/wn)) + bdn*cosh(arcsinh(xn))*sinh(arctanh(yn/wn)) + adn1*sinh(arcsinh(xn1))*cosh(arctanh(yn1/wn1)) + bdn1*cosh(arcsinh(xn1))*sinh(arctanh(yn1/wn1)))        
-
-    def con5(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return adn1 - adn - .5*h*(bdn*bdn*sinh(arcsinh(xn))*cosh(arcsinh(xn)) + bdn1*bdn1*sinh(arcsinh(xn1))*cosh(arcsinh(xn1)))
-
-    def con6(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(arcsinh(xn))- 2.*adn1*bdn1*tanh(arcsinh(xn1)))
-
-    def con7(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return gdn1 - gdn - .5*h*(0. + 0.)        
-
-    def con8(xn, xn1, yn, yn1, zn, zn1, wn, wn1, adn, adn1, bdn, bdn1, gdn, gdn1, mu, h): 
-        return xn1*xn1 + yn1*yn1 - wn1*wn1 + 1.
-    
-    h = step
-    mui = 10e-10
-    mat=array([
-        [1.,0.,0.,0.,0.,0.,0.,-4.*posn[0]],
-        [0.,1.,0.,0.,0.,0.,0.,-4.*posn[1]],
-        [0.,0.,1.,0.,0.,0.,0.,0.],
-        [0.,0.,0.,1.,0.,0.,0.,4.*posn[3]],                
-        [0.,0.,0.,0.,1.,0.,0.,0.],
-        [0.,0.,0.,0.,0.,1.,0.,0.], 
-        [0.,0.,0.,0.,0.,0.,1.,0.],               
-        [2.*posn[0],2.*posn[1],0.,-2.*posn[3],0.,0.,0.,0.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con7(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h),
-        con8(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], posn[3], posn1i[3], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], mui, h)        
-    ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], posn1i[3]+diff1[3], veln1i[0]+diff1[4], veln1i[1]+diff1[5], veln1i[2]+diff1[6], mui+diff1[7]])
-    x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,0.,0.,-4.*val1[0]],
-            [0.,1.,0.,0.,0.,0.,0.,-4.*val1[1]],
-            [0.,0.,1.,0.,0.,0.,0.,0.],
-            [0.,0.,0.,1.,0.,0.,0.,4.*val1[3]],                
-            [0.,0.,0.,0.,1.,0.,0.,0.],
-            [0.,0.,0.,0.,0.,1.,0.,0.], 
-            [0.,0.,0.,0.,0.,0.,1.,0.],               
-            [2.*val1[0],2.*val1[1],0.,-2.*val1[3],0.,0.,0.,0.]
-        ])
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con7(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),
-            con8(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], posn[3], val1[3], veln[0], val1[4], veln[1], val1[5], veln[2], val1[6], val1[7], h),            
-        ]))
-        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5], val1[6]+diff2[6], val1[7]+diff2[7]])        
-        val1 = val2
-        x=x+1
-    return[val1]
+# This is the workhorse solver for H2xE. See the label for the H2 version for more
+# details.
 
 def imph2egeotrans(posn, posn1i, veln, veln1i, step):
     

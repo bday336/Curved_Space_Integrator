@@ -45,8 +45,8 @@ ggt=append(ggt, array([positions[0][2],positions[1][2]]))
 
 # Numerical Integration step
 step_data=array([
-	imph3geotrans(positions[0], positions[0], velocities[0], velocities[0], delT), 
-	imph3geotrans(positions[1], positions[1], velocities[1], velocities[1], delT)
+	imph3geotrans(positions[0], velocities[0], delT), 
+	imph3geotrans(positions[1], velocities[1], delT)
 	])
 
 # Include the first time step
@@ -69,8 +69,8 @@ while(q < nump-1):
         nextdot = array([step_data[0][3:6], step_data[1][3:6]])
 
     step_data=array([
-        imph3geotrans(nextpos[0], nextpos[0], nextdot[0], nextdot[0], delT), 
-        imph3geotrans(nextpos[1], nextpos[1], nextdot[1], nextdot[1], delT)
+        imph3geotrans(nextpos[0], nextdot[0], delT), 
+        imph3geotrans(nextpos[1], nextdot[1], delT)
         ])
 
     gat=append(gat, array([step_data[0][0],step_data[1][0]]))
