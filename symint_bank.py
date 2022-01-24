@@ -19,7 +19,8 @@ from function_bank import boostxh2e,h2dist,boostxh2,rotzh2,convertpos_hyp2paratr
 # we can compare with the exact results that are known. So far it seems that it is rather
 # effective at generating the correct geodesics. There does seem to be some resonance 
 # behavior in the E3 error compare with the exact trajectory, which I still am not sure
-# what the origin of it is.
+# what the origin of it is. I have also simplified the solver in that the initial guess
+# for the iterator automatically takes the values from the given current position and velocity.
 
 def imph2geotrans(posn, veln, step):
 
@@ -374,7 +375,7 @@ def imph3georot(posn, veln, step):
 # This is the workhorse solver for H2xE. See the label for the H2 version for more
 # details.
 
-def imph2egeotrans(posn, posn1i, veln, veln1i, step):
+def imph2egeotrans(posn, veln, step):
     
     def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -392,44 +393,36 @@ def imph2egeotrans(posn, posn1i, veln, veln1i, step):
         return bdn1 - bdn - .5*h*(-2.*adn*bdn*tanh(an) - 2.*adn1*bdn1*tanh(an1))
 
     def con6(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
-        return gdn1 - gdn - .5*h*(0. + 0.)         
+        return gdn1 - gdn - .5*h*(0. + 0.)   
+
+    def jacobian(an1, bn1, gn1, adn1, bdn1, gdn1, h):
+        return array([
+                    [1.,0.,0.,-.5*h,0.,0.],
+                    [0.,1.,0.,0.,-.5*h,0.],
+                    [0.,0.,1.,0.,0.,-.5*h],
+                    [-.5*h*bdn1*bdn1*cosh(2*an1),0.,0.,1.,-h*sinh(an1)*cosh(an1)*bdn1,0.],
+                    [h*adn1*bdn1/(cosh(an1)*cosh(an1)),0.,0.,h*tanh(an1)*bdn1,1.+h*tanh(an1)*adn1,0.],
+                    [0.,0.,0.,0.,0.,1.]
+                ])      
     
-    h = step
-    mui = 10e-10
-    mat=array([
-        [1.,0.,0.,0.,0.,0.],
-        [0.,1.,0.,0.,0.,0.],
-        [0.,0.,1.,0.,0.,0.],
-        [0.,0.,0.,1.,0.,0.],
-        [0.,0.,0.,0.,1.,0.],
-        [0.,0.,0.,0.,0.,1.]
-    ])
-    diff1=linalg.solve(mat,-array([
-        con1(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con2(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con3(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con4(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con5(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h),
-        con6(posn[0], posn1i[0], posn[1], posn1i[1], posn[2], posn1i[2], veln[0], veln1i[0], veln[1], veln1i[1], veln[2], veln1i[2], h)
+    diff1=linalg.solve(jacobian(posn[0], posn[1], posn[2], veln[0], veln[1], veln[2], step),-array([
+        con1(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con2(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con3(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con4(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con5(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step),
+        con6(posn[0], posn[0], posn[1], posn[1], posn[2], posn[2], veln[0], veln[0], veln[1], veln[1], veln[2], veln[2], step)
     ]))
-    val1 = array([posn1i[0]+diff1[0], posn1i[1]+diff1[1], posn1i[2]+diff1[2], veln1i[0]+diff1[3], veln1i[1]+diff1[4], veln1i[2]+diff1[5]])
+    val1 = array([posn[0]+diff1[0], posn[1]+diff1[1], posn[2]+diff1[2], veln[0]+diff1[3], veln[1]+diff1[4], veln[2]+diff1[5]])
     x = 0
-    while(x < 7):
-        mat=array([
-            [1.,0.,0.,0.,0.,0.],
-            [0.,1.,0.,0.,0.,0.],
-            [0.,0.,1.,0.,0.,0.],
-            [0.,0.,0.,1.,0.,0.],
-            [0.,0.,0.,0.,1.,0.],
-            [0.,0.,0.,0.,0.,1.]
-        ])        
-        diff2=linalg.solve(mat,-array([
-            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h),
-            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], h)
+    while(x < 7):      
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], val1[4], val1[5], step),-array([
+            con1(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con2(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con3(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con4(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con5(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step),
+            con6(posn[0], val1[0], posn[1], val1[1], posn[2], val1[2], veln[0], val1[3], veln[1], val1[4], veln[2], val1[5], step)
         ]))
         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5]])        
         val1 = val2
