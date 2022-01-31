@@ -14,8 +14,8 @@ from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arcc
 
 #Initialize the particles in the simulation
 particles=array([
-    [.5,np.pi/2.,0.,.0,0.,0.,1.,.2],          #particle 1
-    [.5,np.pi/2.,np.pi,0.,.0,0.,1.,.2]        #particle 2
+    [.5,np.pi/2.,0.,.0,.0,.5,1.,.2],          #particle 1
+    [.5,np.pi/2.,np.pi,.0,.0,.5,1.,.2]        #particle 2
     ])
 
 # Initialize the parameters of what I will consider the
@@ -107,8 +107,11 @@ y = np.sin(u)*np.sin(v)
 z = np.cos(u)
 ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
 ax1.set_xlim3d(-1,1)
+ax1.set_xlabel('X')
 ax1.set_ylim3d(-1,1)
+ax1.set_ylabel('Y')
 ax1.set_zlim3d(-1,1)
+ax1.set_zlabel('Z')
 
 part1x,part1y,part1z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[0][7])
 part2x,part2y,part2z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[1][7])

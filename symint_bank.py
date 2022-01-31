@@ -755,104 +755,194 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
     # I have found that I do not need to make functions for both particles since I can just flip the arguments
     # and it should work fine since they are symmetric.
 
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2.
     def D12(a1, b1, g1, a2, b2, g2):
-        return -sinh(a1)*sinh(a2) + cosh(a1)*cosh(a2)*(cosh(b1)*cosh(b2)*cosh(g1 - g2) - sinh(b1)*sinh(b2))
+        return -sinh(a1)*sinh(a2) - cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
 
-    def D12a1(a1, b1, g1, a2, b2, g2):
-        return -cosh(a1)*sinh(a2) + cosh(a2)*sinh(a1)*(cosh(b1)*cosh(b2)*cosh(g1 - g2) - sinh(b1)*sinh(b2))
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only three functions are needed instead of six.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
+    # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
+    # dg2D12 = dg1D12(a2, b2, g2, a1, b1, g1)
+    def da1D12(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sinh(a2) - sinh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
 
-    def D12a2(a1, b1, g1, a2, b2, g2):
-        return D12(a1, b1, g1, a2, b2, g2)
+    def db1D12(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2) 
 
-    def D12b1(a1, b1, g1, a2, b2, g2):
-        return cosh(a1)*cosh(a2)*(sinh(b1)*cosh(b2)*cosh(g1 - g2) - cosh(b1)*sinh(b2))
+    def dg1D12(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)      
+    
 
-    def D12b2(a1, b1, g1, a2, b2, g2):
-        return cosh(a1)*cosh(a2)*(cosh(b1)*cosh(b2)*cosh(g1 - g2) - sinh(b1)*sinh(b2))
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. This only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
+    # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
 
-    def D12g1(a1, b1, g1, a2, b2, g2):
-        return cosh(a1)*cosh(a2)*cosh(b1)*cosh(b2)*sinh(g1 - g2)
+    # da2D12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
 
-    def D12g2(a1, b1, g1, a2, b2, g2):
-        return cosh(a1)*cosh(a2)*cosh(b1)*cosh(b2)*cosh(g1 - g2)
+    # da2D12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+    # dg2D12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
 
-    def jacobi_sp_terms(a1, b1, g1, a2, b2, g2, m1, k, xo):
+    # db2D12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+    # dg2D12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+    # dg2D12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+    # For the remaining lower portion of the total square matrix of terms (fifteen values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sinh(a2) - cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def db1D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cosh(b1)*cosh(a2)*sinh(b2) + sinh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def dg1D12a1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def da2D12a1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(a2) - sinh(a1)*sinh(b1)*sinh(a2)*sinh(b2) + sinh(a1)*cosh(b1)*sinh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def db2D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sinh(b1)*cosh(a2)*cosh(b2) + sinh(a1)*cosh(b1)*cosh(a2)*sinh(b2)*cosh(g1 - g2)
+
+    def dg2D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def db1D12b1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def dg1D12b1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def db2D12b1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2) + cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2)*cosh(g1 - g2)
+
+    def dg2D12b1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def dg1D12g1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def dg2D12g1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(a1, b1, g1, a2, b2, g2, m1, m2, k, xo):
+        # D function
         d12=D12(a1, b1, g1, a2, b2, g2)
-        d12a1=D12a1(a1, b1, g1, a2, b2, g2)
-        d12a2=D12a2(a1, b1, g1, a2, b2, g2)
-        d12b1=D12b1(a1, b1, g1, a2, b2, g2)
-        d12b2=D12b2(a1, b1, g1, a2, b2, g2)
-        d12g1=D12g1(a1, b1, g1, a2, b2, g2)
-        d12g2=D12g2(a1, b1, g1, a2, b2, g2)
-        return array([
-            [-k/(m1*1.)*( (d12a1**2.)/( ( d12**2. - 1.) )*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12a2 - 1.*d12a1*0.) ),
-            -k/(m1*1.)*( (d12b1**2.)/( ( d12**2. - 1.) )*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12b2 - 1.*d12b1*0.) ),
-            -k/(m1*1.)*( (d12g1**2.)/( ( d12**2. - 1.) )*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12g2 - 1.*d12g1*0.) )],
-
-            [-k/(m1*cosh(a1)*cosh(a1))*( (d12a1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12a2 - cosh(a1)*cosh(a1)*d12a1*sinh(2.*a1)) ),
-            -k/(m1*cosh(a1)*cosh(a1))*( (d12b1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12b2 - cosh(a1)*cosh(a1)*d12b1*0.) ),
-            -k/(m1*cosh(a1)*cosh(a1))*( (d12g1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12g2 - cosh(a1)*cosh(a1)*d12g1*0.) )],
-
-            [-k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1))*( (d12a1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12a2 - cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*d12a1*(sinh(2.*a1)*cosh(b1)*cosh(b1))) ),
-            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1))*( (d12b1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12b2 - cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*d12b1*(sinh(2.*b1)*cosh(a1)*cosh(a1))) ),
-            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1))*( (d12g1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12g2 - cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*d12g1*0.) )]
-        ])
-
-
-    # def spforceaa(a1, b1, g1, a2, b2, g2, m1, k, xo):
-    #     d12=D12(a1, b1, g1, a2, b2, g2)
-    #     d12a1=D12a1(a1, b1, g1, a2, b2, g2)
-    #     d12a2=D12a2(a1, b1, g1, a2, b2, g2)
-    #     return -k/(m1*1.)*( (d12a1**2.)/( ( d12**2. - 1.) )*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12a2 - 1.*d12a1*0.) ) 
-
-    # def spforceab(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1, b1, g1, a2, b2, g2)
-    #     d12b1=D12b1(a1, b1, g1, a2, b2, g2)
-    #     d12b2=D12b2(a1, b1, g1, a2, b2, g2)
-    #     return -k/(m1*1.)*( (d12b1**2.)/( ( d12**2. - 1.) )*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12b2 - 1.*d12b1*0.) )
-
-    # def spforceag(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1, b1, g1, a2, b2, g2)
-    #     d12g1=D12g1(a1, b1, g1, a2, b2, g2)
-    #     d12g2=D12g2(a1, b1, g1, a2, b2, g2)
-    #     return -k/(m1*1.)*( (d12g1**2.)/( ( d12**2. - 1.) )*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12g2 - 1.*d12g1*0.) )
-
-    # def spforceba(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12a1=D12a1(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12a2=D12a2(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     return -k/(m1*cosh(a1n)*cosh(a1n))*( (d12a1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12a2 - cosh(a1n)*cosh(a1n)*d12a1*sinh(2.*a1n)) ) 
-
-    # def spforcebb(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12b1=D12b1(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12b2=D12b2(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     return -k/(m1*cosh(a1n)*cosh(a1n))*( (d12b1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12b2 - cosh(a1n)*cosh(a1n)*d12b1*0.) )
-
-    # def spforcebg(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12g1=D12g1(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12g2=D12g2(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     return -k/(m1*cosh(a1n)*cosh(a1n))*( (d12g1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12g2 - cosh(a1n)*cosh(a1n)*d12g1*0.) )
-
-    # def spforcega(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12a1=D12a1(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12a2=D12a2(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     return -k/(m1*cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n))*( (d12a1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12a2 - cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n)*d12a1*(sinh(2.*a1n)*cosh(b1n)*cosh(b1n))) ) 
-
-    # def spforcegb(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12b1=D12b1(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12b2=D12b2(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     return -k/(m1*cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n))*( (d12b1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12b2 - cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n)*d12b1*(sinh(2.*b1n)*cosh(a1n)*cosh(a1n))) )
-
-    # def spforcegg(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, k, xo):
-    #     d12=D12(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12g1=D12g1(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     d12g2=D12g2(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1)
-    #     return -k/(m1*cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n))*( (d12g1**2.)/( d12**2. - 1.)*( 1. - ( d12*( arccosh(d12) - xo ) )/( sqrt( d12**2. - 1. ) ) ) + ( arccosh(d12) - xo )/( sqrt( d12**2. - 1. ) ) * ( d12g2 - cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n)*d12g1*0.) )
+        # First derivatives of D function
+        da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+        db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+        dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+        da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+        db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+        dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+        # Second derivatives of D function
+        da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+        db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+        dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+        da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+        db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+        dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
         
+        da1d12b1=db1d12a1
+        db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+        dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+        da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+        dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+        da1d12g1=dg1d12a1
+        db1d12g1=dg1d12b1
+        dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+        da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+        dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+        da1d12a2=da2d12a1
+        db1d12a2=da2d12b1
+        dg1d12a2=da2d12g1
+        da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+        dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+        da1d12b2=db2d12a1
+        db1d12b2=db2d12b1
+        dg1d12b2=db2d12g1
+        da2d12b2=db2d12a2
+        db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+        dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+        da1d12g2=dg2d12a1
+        db1d12g2=dg2d12b1
+        dg1d12g2=dg2d12g1
+        da2d12g2=dg2d12a2
+        db2d12g2=dg2d12b2
+        dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+        return array([
+            [-k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*da1d12/(d12**2. - 1.) - da1d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*db1d12/(d12**2. - 1.) - db1d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*dg1d12/(d12**2. - 1.) - dg1d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*da2d12/(d12**2. - 1.) - da2d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*db2d12/(d12**2. - 1.) - db2d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*dg2d12/(d12**2. - 1.) - dg2d12a1) )],
+
+            [-k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d12*db1d12*da1d12/(d12**2. - 1.) - da1d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db1d12/(d12**2. - 1.) - db1d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*dg1d12/(d12**2. - 1.) - dg1d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*da2d12/(d12**2. - 1.) - da2d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db2d12/(d12**2. - 1.) - db2d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*dg2d12/(d12**2. - 1.) - dg2d12b1) )],
+
+            [-k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg1d12*sinh(2.*a1)*cosh(b1)*cosh(b1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*da1d12/(d12**2. - 1.) - da1d12g1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg1d12*sinh(2.*b1)*cosh(a1)*cosh(a1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*db1d12/(d12**2. - 1.) - db1d12g1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*dg1d12/(d12**2. - 1.) - dg1d12g1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*da2d12/(d12**2. - 1.) - da2d12g1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*db2d12/(d12**2. - 1.) - db2d12g1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*dg2d12/(d12**2. - 1.) - dg2d12g1) )],
+
+            [-k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*da1d12/(d12**2. - 1.) - da1d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*db1d12/(d12**2. - 1.) - db1d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*dg1d12/(d12**2. - 1.) - dg1d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*da2d12/(d12**2. - 1.) - da2d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*db2d12/(d12**2. - 1.) - db2d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*dg2d12/(d12**2. - 1.) - dg2d12a2) )],
+
+            [-k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*da1d12/(d12**2. - 1.) - da1d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db1d12/(d12**2. - 1.) - db1d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*dg1d12/(d12**2. - 1.) - dg1d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d12*db2d12*da2d12/(d12**2. - 1.) - da2d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db2d12/(d12**2. - 1.) - db2d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*dg2d12/(d12**2. - 1.) - dg2d12b2) )],
+
+            [-k/(m2*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*da1d12/(d12**2. - 1.) - da1d12g2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*db1d12/(d12**2. - 1.) - db1d12g2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*dg1d12/(d12**2. - 1.) - dg1d12g2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg2d12*sinh(2.*a2)*cosh(b2)*cosh(b2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*da2d12/(d12**2. - 1.) - da2d12g2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg2d12*sinh(2.*b2)*cosh(a2)*cosh(a2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*db2d12/(d12**2. - 1.) - db2d12g2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*dg2d12/(d12**2. - 1.) - dg2d12g2) )]
+
+        ])
    
     def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
         return an1 - an - .5*h*(adn + adn1)
@@ -865,46 +955,45 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
 
     def con4(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, h, k, xo):
         return (ad1n1 - ad1n - .5*h*(
-            (bd1n*bd1n + gd1n*gd1n*cosh(b1n)**2.)*sinh(a1n)*cosh(a1n) - k/(m1*cosh(a1n)*cosh(a1n))*(-xo + 
-            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))*
-            -cosh(a1n)*sinh(a2n) + cosh(a2n)*sinh(a1n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))/sqrt(-1. + 
+            (bd1n*bd1n + gd1n*gd1n*cosh(b1n)**2.)*sinh(a1n)*cosh(a1n) - k/m1*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (-cosh(a1n)*sinh(a2n) - sinh(a1n)*sinh(b1n)*cosh(a2n)*sinh(b2n) + sinh(a1n)*cosh(b1n)*cosh(a2n)*cosh(b2n)*cosh(g1n - g2n))/sqrt(-1. + 
             (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))**2.)
             + 
-            (bd1n1*bd1n1 + gd1n1*gd1n1*cosh(b1n1)**2.)*sinh(a1n1)*cosh(a1n1) - k/(m1*cosh(a1n1)*cosh(a1n1))*(-xo + 
-            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))*
-            -cosh(a1n1)*sinh(a2n1) + cosh(a2n1)*sinh(a1n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))/sqrt(-1. + 
-            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.)
+            (bd1n1*bd1n1 + gd1n1*gd1n1*cosh(b1n1)**2.)*sinh(a1n1)*cosh(a1n1) - k/m1*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (-cosh(a1n1)*sinh(a2n1) - sinh(a1n1)*sinh(b1n1)*cosh(a2n1)*sinh(b2n1) + sinh(a1n1)*cosh(b1n1)*cosh(a2n1)*cosh(b2n1)*cosh(g1n1 - g2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.) 
             ))
 
     def con5(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, h, k, xo):
         return (bd1n1 - bd1n - .5*h*(
-            gd1n*gd1n*sinh(b1n)*cosh(b1n) - 2.*ad1n*bd1n*tanh(a1n) - k/m1*(-xo + 
-            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))*
-            cosh(a1n)*cosh(a2n)*(cosh(b2n)*cosh(g1n - g2n)*sinh(b1n) - cosh(b1n)*sinh(b2n)))/sqrt(-1. + 
+            gd1n*gd1n*sinh(b1n)*cosh(b1n) - 2.*ad1n*bd1n*tanh(a1n) - k/(m1*cosh(a1n)*cosh(a1n))*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (-cosh(a1n)*cosh(b1n)*cosh(a2n)*sinh(b2n) + cosh(a1n)*sinh(b1n)*cosh(a2n)*cosh(b2n)*cosh(g1n - g2n))/sqrt(-1. + 
             (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))**2.)
             + 
-            gd1n1*gd1n1*sinh(b1n1)*cosh(b1n1) - 2.*ad1n1*bd1n1*tanh(a1n1) - k/m1*(-xo + 
-            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))*
-            cosh(a1n1)*cosh(a2n1)*(cosh(b2n1)*cosh(g1n1 - g2n1)*sinh(b1n1) - cosh(b1n1)*sinh(b2n1)))/sqrt(-1. + 
-            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.)   
+            gd1n1*gd1n1*sinh(b1n1)*cosh(b1n1) - 2.*ad1n1*bd1n1*tanh(a1n1) - k/(m1*cosh(a1n1)*cosh(a1n1))*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (-cosh(a1n1)*cosh(b1n1)*cosh(a2n1)*sinh(b2n1) + cosh(a1n1)*sinh(b1n1)*cosh(a2n1)*cosh(b2n1)*cosh(g1n1 - g2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.)  
             ))
 
     def con6(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, h, k, xo):
         return (gd1n1 - gd1n - .5*h*(
-            -2.*ad1n*gd1n*tanh(a1n) - 2.*bd1n*gd1n*tanh(b1n) - k/(m1*cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n))*(-xo + 
-            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))*
-            cosh(a1n)*cosh(a2n)*cosh(b1n)*cosh(b2n)*sinh(g1n - g2n))/sqrt(-1. + 
+            -2.*ad1n*gd1n*tanh(a1n) - 2.*bd1n*gd1n*tanh(b1n) - k/(m1*cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n))*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (cosh(a1n)*cosh(b1n)*cosh(a2n)*cosh(b2n)*sinh(g1n - g2n))/sqrt(-1. + 
             (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))**2.)
             + 
-            -2.*ad1n1*gd1n1*tanh(a1n1) - 2.*bd1n1*gd1n1*tanh(b1n1) - k/(m1*cosh(a1n1)*cosh(a1n1)*cosh(b1n1)*cosh(b1n1))*(-xo + 
-            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))*
-            cosh(a1n1)*cosh(a2n1)*cosh(b1n1)*cosh(b2n1)*sinh(g1n1 - g2n1))/sqrt(-1. + 
+            -2.*ad1n1*gd1n1*tanh(a1n1) - 2.*bd1n1*gd1n1*tanh(b1n1) - k/(m1*cosh(a1n1)*cosh(a1n1)*cosh(b1n1)*cosh(b1n1))*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (cosh(a1n1)*cosh(b1n1)*cosh(a2n1)*cosh(b2n1)*sinh(g1n1 - g2n1))/sqrt(-1. + 
             (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.)
             )) 
     
     def jacobian(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, ad1n1, bd1n1, gd1n1, ad2n1, bd2n1, gd2n1, m1, m2, h, k, xo):
-        sp1=jacobi_sp_terms(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, k, xo)
-        sp2=jacobi_sp_terms(a2n1, b2n1, g2n1, a1n1, b1n1, g1n1, m2, k, xo)
+        spring_terms=jacobi_sp_terms(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, m2, k, xo)
         return array([
             [1.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0.],
             [0.,1.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0.],
@@ -915,13 +1004,13 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             [0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,-.5*h],
 
             # ad1 update
-            [-.5*h*(bd1n1*bd1n1+cosh(b1n1)*cosh(b1n1)*gd1n1*gd1n1)*cosh(2.*a1n1) + sp1[0,0],
-            -.25*h*sinh(2.*a1n1)*sinh(2.*b1n1)*gd1n1*gd1n1 + sp1[0,1],
-            0. + sp1[0,2], 
+            [-.5*h*(bd1n1*bd1n1+cosh(b1n1)*cosh(b1n1)*gd1n1*gd1n1)*cosh(2.*a1n1) + spring_terms[0,0],
+            -.25*h*sinh(2.*a1n1)*sinh(2.*b1n1)*gd1n1*gd1n1 + spring_terms[0,1],
+            0. + spring_terms[0,2], 
             
-            sp2[0,0],
-            sp2[0,1],
-            sp2[0,2],
+            spring_terms[0,3],
+            spring_terms[0,4],
+            spring_terms[0,5],
             
             1.,
             -.5*h*sinh(2.*a1n1)*bd1n1,
@@ -932,13 +1021,13 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             0.],
 
             # bd1 update
-            [h*ad1n1*bd1n1/(cosh(a1n1)*cosh(a1n1)) + sp1[1,0],
-            -.5*h*cosh(2.*b1n1)*gd1n1*gd1n1 + sp1[1,1],
-            0. + sp1[1,2], 
+            [h*ad1n1*bd1n1/(cosh(a1n1)*cosh(a1n1)) + spring_terms[1,0],
+            -.5*h*cosh(2.*b1n1)*gd1n1*gd1n1 + spring_terms[1,1],
+            0. + spring_terms[1,2], 
             
-            sp2[1,0],
-            sp2[1,1],
-            sp2[1,2],
+            spring_terms[1,3],
+            spring_terms[1,4],
+            spring_terms[1,5],
             
             h*tanh(a1n1)*bd1n1,
             1.+h*tanh(a1n1)*ad1n1,
@@ -949,13 +1038,13 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             0.],
 
             # gd1 update
-            [h*ad1n1*gd1n1/(cosh(a1n1)*cosh(a1n1)) + sp1[2,0],
-            h*bd1n1*gd1n1/(cosh(b1n1)*cosh(b1n1)) + sp1[2,1],
-            0. + sp1[2,2],
+            [h*ad1n1*gd1n1/(cosh(a1n1)*cosh(a1n1)) + spring_terms[2,0],
+            h*bd1n1*gd1n1/(cosh(b1n1)*cosh(b1n1)) + spring_terms[2,1],
+            0. + spring_terms[2,2],
              
-            sp2[2,0],
-            sp2[2,1],
-            sp2[2,2],
+            spring_terms[2,3],
+            spring_terms[2,4],
+            spring_terms[2,5],
 
             h*tanh(a1n1)*gd1n1,
             h*tanh(b1n1)*gd1n1,
@@ -966,13 +1055,13 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             0.],
 
             # ad2 update
-            [sp1[0,0],
-            sp1[0,1],
-            sp1[0,2],
+            [spring_terms[3,0],
+            spring_terms[3,1],
+            spring_terms[3,2],
 
-            -.5*h*(bd2n1*bd2n1+cosh(b2n1)*cosh(b2n1)*gd2n1*gd2n1)*cosh(2.*a2n1) + sp2[0,0],
-            -.25*h*sinh(2.*a2n1)*sinh(2.*b2n1)*gd2n1*gd2n1 + sp2[0,1],
-            0. + sp2[0,2],
+            -.5*h*(bd2n1*bd2n1+cosh(b2n1)*cosh(b2n1)*gd2n1*gd2n1)*cosh(2.*a2n1) + spring_terms[3,3],
+            -.25*h*sinh(2.*a2n1)*sinh(2.*b2n1)*gd2n1*gd2n1 + spring_terms[3,4],
+            0. + spring_terms[3,5],
 
             0.,
             0.,
@@ -983,13 +1072,13 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             -.5*h*sinh(2.*a2n1)*cosh(b2n1)*cosh(b2n1)*gd2n1],
 
             # bd2 update
-            [sp1[1,0],
-            sp1[1,1],
-            sp1[1,2],
+            [spring_terms[4,0],
+            spring_terms[4,1],
+            spring_terms[4,2],
 
-            h*ad2n1*bd2n1/(cosh(a2n1)*cosh(a2n1)) + sp2[1,0],
-            -.5*h*cosh(2.*b2n1)*gd2n1*gd2n1 + sp2[1,1],
-            0. + sp2[1,2],
+            h*ad2n1*bd2n1/(cosh(a2n1)*cosh(a2n1)) + spring_terms[4,3],
+            -.5*h*cosh(2.*b2n1)*gd2n1*gd2n1 + spring_terms[4,4],
+            0. + spring_terms[4,5],
 
             0.,
             0.,
@@ -1000,13 +1089,13 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             -.5*h*sinh(2.*b2n1)*gd2n1],
 
             # gd2 update
-            [sp1[2,0],
-            sp1[2,1],
-            sp1[2,2],
+            [spring_terms[5,0],
+            spring_terms[5,1],
+            spring_terms[5,2],
 
-            h*ad2n1*gd2n1/(cosh(a2n1)*cosh(a2n1)) + sp2[2,0],
-            h*bd2n1*gd2n1/(cosh(b2n1)*cosh(b2n1)) + sp2[2,1],
-            0. + sp2[2,2],
+            h*ad2n1*gd2n1/(cosh(a2n1)*cosh(a2n1)) + spring_terms[5,3],
+            h*bd2n1*gd2n1/(cosh(b2n1)*cosh(b2n1)) + spring_terms[5,4],
+            0. + spring_terms[5,5],
 
             0.,
             0.,
@@ -1016,6 +1105,8 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
             h*tanh(b2n1)*gd2n1,
             1.+h*tanh(a2n1)*ad2n1+h*tanh(b2n1)*bd2n1]
         ])
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
     diff1=linalg.solve(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist),-array([
         con1(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], step),
         con2(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], step),
@@ -1052,6 +1143,7 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
         val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5], val1[6]+diff2[6], val1[7]+diff2[7], val1[8]+diff2[8], val1[9]+diff2[9], val1[10]+diff2[10], val1[11]+diff2[11]])       
         val1 = val2
         x=x+1
+    # print(val1)
     return val1
 
 # H2xE 3-space Spring Potential 
