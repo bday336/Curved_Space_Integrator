@@ -95,37 +95,37 @@ for b in range(len(gat)):
     gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
     grt=append(grt,cosh(gat[b])*cosh(gbt[b])*sinh(ggt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))	    	     		
 
-#Plot
-fig = plt.figure(figsize=(8,8))
-ax1 = fig.add_subplot(111, projection='3d')
-# ax1.set_aspect("equal")
+# #Plot
+# fig = plt.figure(figsize=(8,8))
+# ax1 = fig.add_subplot(111, projection='3d')
+# # ax1.set_aspect("equal")
 
-#draw sphere
-u, v = np.mgrid[0:np.pi+(np.pi)/15.:(np.pi)/15., 0:2.*np.pi+(2.*np.pi)/15.:(2.*np.pi)/15.]
-x = np.sin(u)*np.cos(v)
-y = np.sin(u)*np.sin(v)
-z = np.cos(u)
-ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
-ax1.set_xlim3d(-1,1)
-ax1.set_xlabel('X')
-ax1.set_ylim3d(-1,1)
-ax1.set_ylabel('Y')
-ax1.set_zlim3d(-1,1)
-ax1.set_zlabel('Z')
+# #draw sphere
+# u, v = np.mgrid[0:np.pi+(np.pi)/15.:(np.pi)/15., 0:2.*np.pi+(2.*np.pi)/15.:(2.*np.pi)/15.]
+# x = np.sin(u)*np.cos(v)
+# y = np.sin(u)*np.sin(v)
+# z = np.cos(u)
+# ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
+# ax1.set_xlim3d(-1,1)
+# ax1.set_xlabel('X')
+# ax1.set_ylim3d(-1,1)
+# ax1.set_ylabel('Y')
+# ax1.set_zlim3d(-1,1)
+# ax1.set_zlabel('Z')
 
-part1x,part1y,part1z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[0][7])
-part2x,part2y,part2z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[1][7])
+# part1x,part1y,part1z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[0][7])
+# part2x,part2y,part2z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[1][7])
 
-#draw trajectory
-ax1.plot3D(gut[0::2],gvt[0::2],grt[0::2], label="particle 1")
-ax1.plot3D(gut[1::2],gvt[1::2],grt[1::2], label="particle 2")
-ax1.legend(loc= 'lower left')
+# #draw trajectory
+# ax1.plot3D(gut[0::2],gvt[0::2],grt[0::2], label="particle 1")
+# ax1.plot3D(gut[1::2],gvt[1::2],grt[1::2], label="particle 2")
+# ax1.legend(loc= 'lower left')
 
-ax1.plot_surface(part1x, part1y, part1z, color="b")
-ax1.plot_surface(part2x, part2y, part2z, color="b")
+# ax1.plot_surface(part1x, part1y, part1z, color="b")
+# ax1.plot_surface(part2x, part2y, part2z, color="b")
 	
 
-plt.show()
+# plt.show()
 
 # #Generate gif
 # # create empty lists for the x and y data
@@ -178,5 +178,5 @@ plt.show()
 # # have changed.
 # anim = animation.FuncAnimation(fig, animate,frames=frames, interval=50)
 
-# anim.save('./h3collision_test.gif', writer='imagemagick')
+# anim.save('./h3spring_test.gif', writer='imagemagick')
 
