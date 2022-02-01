@@ -95,6 +95,14 @@ for b in range(len(gat)):
     gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
     grt=append(grt,cosh(gat[b])*cosh(gbt[b])*sinh(ggt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))	    	     		
 
+#####################
+#  PLOTTING SECTION #
+#####################
+
+# ------------------------------------------------------------------
+### Uncomment to just plot trajectory in the Poincare disk model ###
+# ------------------------------------------------------------------
+
 # #Plot
 # fig = plt.figure(figsize=(8,8))
 # ax1 = fig.add_subplot(111, projection='3d')
@@ -123,9 +131,12 @@ for b in range(len(gat)):
 
 # ax1.plot_surface(part1x, part1y, part1z, color="b")
 # ax1.plot_surface(part2x, part2y, part2z, color="b")
-	
 
 # plt.show()
+
+# ------------------------------------------------------------------
+### Uncomment to just generate gif of trajectory of the particle ###
+# ------------------------------------------------------------------
 
 # #Generate gif
 # # create empty lists for the x and y data
