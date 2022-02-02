@@ -1517,7 +1517,2051 @@ def imph2esptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
     # print(val1)
     return val1
 
+##################
+##################
+### SPRING BOX ###
+##################
+##################
 
+# -----------------------------------------------------------------------------------------
+
+def imph3boxtrans(posn_arr, veln_arr, step, mass_arr, spring_arr):
+
+    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
+    # I have found that I do not need to make functions for both particles since I can just flip the arguments
+    # and it should work fine since they are symmetric. In principle, I think that I do not need to generate
+    # any new functions for this system. I just have to be careful with the arguments I use in the functions.
+    # In spring terms are more numerous given that each particle is connected to three other particles. When 
+    # using the below functions the more general notation of Dmn just needs to be considered with 1=m and 2=n.
+    # This is so I do not introduce any unintended errors by changing the variables.
+
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2. This can be used as a general function
+    # I just have to be careful about the arguments for the various particle pairs.
+    def D12(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sinh(a2) - cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only three functions are needed instead of six.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
+    # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
+    # dg2D12 = dg1D12(a2, b2, g2, a1, b1, g1)
+    def da1D12(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sinh(a2) - sinh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def db1D12(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2) 
+
+    def dg1D12(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)      
+    
+
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
+    # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+    # dg2D12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+    # db2D12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+    # dg2D12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+    # dg2D12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+    # For the remaining lower portion of the total square matrix of terms (fifteen values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sinh(a2) - cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def db1D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cosh(b1)*cosh(a2)*sinh(b2) + sinh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def dg1D12a1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def da2D12a1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(a2) - sinh(a1)*sinh(b1)*sinh(a2)*sinh(b2) + sinh(a1)*cosh(b1)*sinh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def db2D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sinh(b1)*cosh(a2)*cosh(b2) + sinh(a1)*cosh(b1)*cosh(a2)*sinh(b2)*cosh(g1 - g2)
+
+    def dg2D12a1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def db1D12b1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def dg1D12b1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def db2D12b1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2) + cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2)*cosh(g1 - g2)
+
+    def dg2D12b1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)*sinh(g1 - g2)
+
+    def dg1D12g1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    def dg2D12g1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)*cosh(g1 - g2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(a1, b1, g1, a2, b2, g2, a3, b3, g3, a4, b4, g4, a5, b5, g5, a6, b6, g6, a7, b7, g7, a8, b8, g8, mass_arr, spring_arr):
+        ### Spring 1-2 spring_arr[0]###
+        # D function
+        d12=D12(a1, b1, g1, a2, b2, g2)
+        # First derivatives of D function
+        da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+        db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+        dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+        da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+        db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+        dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+        # Second derivatives of D function
+        da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+        db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+        dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+        da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+        db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+        dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
+        
+        da1d12b1=db1d12a1
+        db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+        dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+        da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+        dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+        da1d12g1=dg1d12a1
+        db1d12g1=dg1d12b1
+        dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+        da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+        dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+        da1d12a2=da2d12a1
+        db1d12a2=da2d12b1
+        dg1d12a2=da2d12g1
+        da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+        dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+        da1d12b2=db2d12a1
+        db1d12b2=db2d12b1
+        dg1d12b2=db2d12g1
+        da2d12b2=db2d12a2
+        db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+        dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+        da1d12g2=dg2d12a1
+        db1d12g2=dg2d12b1
+        dg1d12g2=dg2d12g1
+        da2d12g2=dg2d12a2
+        db2d12g2=dg2d12b2
+        dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+
+        ### Spring 1-3 spring_arr[1]###
+        # D function
+        d13=D12(a1, b1, g1, a3, b3, g3)
+        # First derivatives of D function
+        da1d13=da1D12(a1, b1, g1, a3, b3, g3)
+        db1d13=db1D12(a1, b1, g1, a3, b3, g3)
+        dg1d13=dg1D12(a1, b1, g1, a3, b3, g3)
+        da3d13=da1D12(a3, b3, g3, a1, b1, g1)
+        db3d13=db1D12(a3, b3, g3, a1, b1, g1)
+        dg3d13=dg1D12(a3, b3, g3, a1, b1, g1)
+        # Second derivatives of D function
+        da1d13a1=da1D12a1(a1, b1, g1, a3, b3, g3)
+        db1d13a1=db1D12a1(a1, b1, g1, a3, b3, g3)
+        dg1d13a1=dg1D12a1(a1, b1, g1, a3, b3, g3)
+        da3d13a1=da2D12a1(a1, b1, g1, a3, b3, g3)
+        db3d13a1=db2D12a1(a1, b1, g1, a3, b3, g3)
+        dg3d13a1=dg2D12a1(a1, b1, g1, a3, b3, g3)
+        
+        da1d13b1=db1d13a1
+        db1d13b1=db1D12b1(a1, b1, g1, a3, b3, g3)
+        dg1d13b1=dg1D12b1(a1, b1, g1, a3, b3, g3)
+        da3d13b1 = db2D12a1(a3, b3, g3, a1, b1, g1)
+        db3d13b1=db2D12b1(a1, b1, g1, a3, b3, g3)
+        dg3d13b1=dg2D12b1(a1, b1, g1, a3, b3, g3)
+
+        da1d13g1=dg1d13a1
+        db1d13g1=dg1d13b1
+        dg1d13g1=dg1D12g1(a1, b1, g1, a3, b3, g3)
+        da3d13g1 = dg2D12a1(a3, b3, g3, a1, b1, g1)
+        db3d13g1 = dg2D12b1(a3, b3, g3, a1, b1, g1)
+        dg3d13g1=dg2D12g1(a1, b1, g1, a3, b3, g3)
+
+        da1d13a3=da3d13a1
+        db1d13a3=da3d13b1
+        dg1d13a3=da3d13g1
+        da3d13a3 = da1D12a1(a3, b3, g3, a1, b1, g1)
+        db3d13a3 = db1D12a1(a3, b3, g3, a1, b1, g1)
+        dg3d13a3 = dg1D12a1(a3, b3, g3, a1, b1, g1)
+
+        da1d13b3=db3d13a1
+        db1d13b3=db3d13b1
+        dg1d13b3=db3d13g1
+        da3d13b3=db3d13a3
+        db3d13b3 = db1D12b1(a3, b3, g3, a1, b1, g1)
+        dg3d13b3 = dg1D12b1(a3, b3, g3, a1, b1, g1)
+
+        da1d13g3=dg3d13a1
+        db1d13g3=dg3d13b1
+        dg1d13g3=dg3d13g1
+        da3d13g3=dg3d13a3
+        db3d13g3=dg3d13b3
+        dg3d13g3 = dg1D12g1(a3, b3, g3, a1, b1, g1)
+
+
+        ### Spring 1-5 spring_arr[2]###
+        # D function
+        d15=D12(a1, b1, g1, a5, b5, g5)
+        # First derivatives of D function
+        da1d15=da1D12(a1, b1, g1, a5, b5, g5)
+        db1d15=db1D12(a1, b1, g1, a5, b5, g5)
+        dg1d15=dg1D12(a1, b1, g1, a5, b5, g5)
+        da5d15=da1D12(a5, b5, g5, a1, b1, g1)
+        db5d15=db1D12(a5, b5, g5, a1, b1, g1)
+        dg5d15=dg1D12(a5, b5, g5, a1, b1, g1)
+        # Second derivatives of D function
+        da1d15a1=da1D12a1(a1, b1, g1, a5, b5, g5)
+        db1d15a1=db1D12a1(a1, b1, g1, a5, b5, g5)
+        dg1d15a1=dg1D12a1(a1, b1, g1, a5, b5, g5)
+        da5d15a1=da2D12a1(a1, b1, g1, a5, b5, g5)
+        db5d15a1=db2D12a1(a1, b1, g1, a5, b5, g5)
+        dg5d15a1=dg2D12a1(a1, b1, g1, a5, b5, g5)
+        
+        da1d15b1=db1d15a1
+        db1d15b1=db1D12b1(a1, b1, g1, a5, b5, g5)
+        dg1d15b1=dg1D12b1(a1, b1, g1, a5, b5, g5)
+        da5d15b1 = db2D12a1(a5, b5, g5, a1, b1, g1)
+        db5d15b1=db2D12b1(a1, b1, g1, a5, b5, g5)
+        dg5d15b1=dg2D12b1(a1, b1, g1, a5, b5, g5)
+
+        da1d15g1=dg1d15a1
+        db1d15g1=dg1d15b1
+        dg1d15g1=dg1D12g1(a1, b1, g1, a5, b5, g5)
+        da5d15g1 = dg2D12a1(a5, b5, g5, a1, b1, g1)
+        db5d15g1 = dg2D12b1(a5, b5, g5, a1, b1, g1)
+        dg5d15g1=dg2D12g1(a1, b1, g1, a5, b5, g5)
+
+        da1d15a5=da5d15a1
+        db1d15a5=da5d15b1
+        dg1d15a5=da5d15g1
+        da5d15a5 = da1D12a1(a5, b5, g5, a1, b1, g1)
+        db5d15a5 = db1D12a1(a5, b5, g5, a1, b1, g1)
+        dg5d15a5 = dg1D12a1(a5, b5, g5, a1, b1, g1)
+
+        da1d15b5=db5d15a1
+        db1d15b5=db5d15b1
+        dg1d15b5=db5d15g1
+        da5d15b5=db5d15a5
+        db5d15b5 = db1D12b1(a5, b5, g5, a1, b1, g1)
+        dg5d15b5 = dg1D12b1(a5, b5, g5, a1, b1, g1)
+
+        da1d15g5=dg5d15a1
+        db1d15g5=dg5d15b1
+        dg1d15g5=dg5d15g1
+        da5d15g5=dg5d15a5
+        db5d15g5=dg5d15b5
+        dg5d15g5 = dg1D12g1(a5, b5, g5, a1, b1, g1)
+
+
+        ### Spring 2-4 spring_arr[3]###
+        # D function
+        d24=D12(a2, b2, g2, a4, b4, g4)
+        # First derivatives of D function
+        da2d24=da1D12(a2, b2, g2, a4, b4, g4)
+        db2d24=db1D12(a2, b2, g2, a4, b4, g4)
+        dg2d24=dg1D12(a2, b2, g2, a4, b4, g4)
+        da4d24=da1D12(a4, b4, g4, a2, b2, g2)
+        db4d24=db1D12(a4, b4, g4, a2, b2, g2)
+        dg4d24=dg1D12(a4, b4, g4, a2, b2, g2)
+        # Second derivatives of D function
+        da2d24a2=da1D12a1(a2, b2, g2, a4, b4, g4)
+        db2d24a2=db1D12a1(a2, b2, g2, a4, b4, g4)
+        dg2d24a2=dg1D12a1(a2, b2, g2, a4, b4, g4)
+        da4d24a2=da2D12a1(a2, b2, g2, a4, b4, g4)
+        db4d24a2=db2D12a1(a2, b2, g2, a4, b4, g4)
+        dg4d24a2=dg2D12a1(a2, b2, g2, a4, b4, g4)
+        
+        da2d24b2=db2d24a2
+        db2d24b2=db1D12b1(a2, b2, g2, a4, b4, g4)
+        dg2d24b2=dg1D12b1(a2, b2, g2, a4, b4, g4)
+        da4d24b2 = db2D12a1(a4, b4, g4, a2, b2, g2)
+        db4d24b2=db2D12b1(a2, b2, g2, a4, b4, g4)
+        dg4d24b2=dg2D12b1(a2, b2, g2, a4, b4, g4)
+
+        da2d24g2=dg2d24a2
+        db2d24g2=dg2d24b2
+        dg2d24g2=dg1D12g1(a2, b2, g2, a4, b4, g4)
+        da4d24g2 = dg2D12a1(a4, b4, g4, a2, b2, g2)
+        db4d24g2 = dg2D12b1(a4, b4, g4, a2, b2, g2)
+        dg4d24g2=dg2D12g1(a2, b2, g2, a4, b4, g4)
+
+        da2d24a4=da4d24a2
+        db2d24a4=da4d24b2
+        dg2d24a4=da4d24g2
+        da4d24a4 = da1D12a1(a4, b4, g4, a2, b2, g2)
+        db4d24a4 = db1D12a1(a4, b4, g4, a2, b2, g2)
+        dg4d24a4 = dg1D12a1(a4, b4, g4, a2, b2, g2)
+
+        da2d24b4=db4d24a2
+        db2d24b4=db4d24b2
+        dg2d24b4=db4d24g2
+        da4d24b4=db4d24a4
+        db4d24b4 = db1D12b1(a4, b4, g4, a2, b2, g2)
+        dg4d24b4 = dg1D12b1(a4, b4, g4, a2, b2, g2)
+
+        da2d24g4=dg4d24a2
+        db2d24g4=dg4d24b2
+        dg2d24g4=dg4d24g2
+        da4d24g4=dg4d24a4
+        db4d24g4=dg4d24b4
+        dg4d24g4 = dg1D12g1(a4, b4, g4, a2, b2, g2)
+
+
+        ### Spring 2-6 spring_arr[4]###
+        # D function
+        d26=D12(a2, b2, g2, a6, b6, g6)
+        # First derivatives of D function
+        da2d26=da1D12(a2, b2, g2, a6, b6, g6)
+        db2d26=db1D12(a2, b2, g2, a6, b6, g6)
+        dg2d26=dg1D12(a2, b2, g2, a6, b6, g6)
+        da6d26=da1D12(a6, b6, g6, a2, b2, g2)
+        db6d26=db1D12(a6, b6, g6, a2, b2, g2)
+        dg6d26=dg1D12(a6, b6, g6, a2, b2, g2)
+        # Second derivatives of D function
+        da2d26a2=da1D12a1(a2, b2, g2, a6, b6, g6)
+        db2d26a2=db1D12a1(a2, b2, g2, a6, b6, g6)
+        dg2d26a2=dg1D12a1(a2, b2, g2, a6, b6, g6)
+        da6d26a2=da2D12a1(a2, b2, g2, a6, b6, g6)
+        db6d26a2=db2D12a1(a2, b2, g2, a6, b6, g6)
+        dg6d26a2=dg2D12a1(a2, b2, g2, a6, b6, g6)
+        
+        da2d26b2=db2d26a2
+        db2d26b2=db1D12b1(a2, b2, g2, a6, b6, g6)
+        dg2d26b2=dg1D12b1(a2, b2, g2, a6, b6, g6)
+        da6d26b2 = db2D12a1(a6, b6, g6, a2, b2, g2)
+        db6d26b2=db2D12b1(a2, b2, g2, a6, b6, g6)
+        dg6d26b2=dg2D12b1(a2, b2, g2, a6, b6, g6)
+
+        da2d26g2=dg2d26a2
+        db2d26g2=dg2d26b2
+        dg2d26g2=dg1D12g1(a2, b2, g2, a6, b6, g6)
+        da6d26g2 = dg2D12a1(a6, b6, g6, a2, b2, g2)
+        db6d26g2 = dg2D12b1(a6, b6, g6, a2, b2, g2)
+        dg6d26g2=dg2D12g1(a2, b2, g2, a6, b6, g6)
+
+        da2d26a6=da6d26a2
+        db2d26a6=da6d26b2
+        dg2d26a6=da6d26g2
+        da6d26a6 = da1D12a1(a6, b6, g6, a2, b2, g2)
+        db6d26a6 = db1D12a1(a6, b6, g6, a2, b2, g2)
+        dg6d26a6 = dg1D12a1(a6, b6, g6, a2, b2, g2)
+
+        da2d26b6=db6d26a2
+        db2d26b6=db6d26b2
+        dg2d26b6=db6d26g2
+        da6d26b6=db6d26a6
+        db6d26b6 = db1D12b1(a6, b6, g6, a2, b2, g2)
+        dg6d26b6 = dg1D12b1(a6, b6, g6, a2, b2, g2)
+
+        da2d26g6=dg6d26a2
+        db2d26g6=dg6d26b2
+        dg2d26g6=dg6d26g2
+        da6d26g6=dg6d26a6
+        db6d26g6=dg6d26b6
+        dg6d26g6 = dg1D12g1(a6, b6, g6, a2, b2, g2)
+
+
+        ### Spring 3-4 spring_arr[5]###
+        # D function
+        d34=D12(a3, b3, g3, a4, b4, g4)
+        # First derivatives of D function
+        da3d34=da1D12(a3, b3, g3, a4, b4, g4)
+        db3d34=db1D12(a3, b3, g3, a4, b4, g4)
+        dg3d34=dg1D12(a3, b3, g3, a4, b4, g4)
+        da4d34=da1D12(a4, b4, g4, a3, b3, g3)
+        db4d34=db1D12(a4, b4, g4, a3, b3, g3)
+        dg4d34=dg1D12(a4, b4, g4, a3, b3, g3)
+        # Second derivatives of D function
+        da3d34a3=da1D12a1(a3, b3, g3, a4, b4, g4)
+        db3d34a3=db1D12a1(a3, b3, g3, a4, b4, g4)
+        dg3d34a3=dg1D12a1(a3, b3, g3, a4, b4, g4)
+        da4d34a3=da2D12a1(a3, b3, g3, a4, b4, g4)
+        db4d34a3=db2D12a1(a3, b3, g3, a4, b4, g4)
+        dg4d34a3=dg2D12a1(a3, b3, g3, a4, b4, g4)
+        
+        da3d34b3=db3d34a3
+        db3d34b3=db1D12b1(a3, b3, g3, a4, b4, g4)
+        dg3d34b3=dg1D12b1(a3, b3, g3, a4, b4, g4)
+        da4d34b3 = db2D12a1(a4, b4, g4, a3, b3, g3)
+        db4d34b3=db2D12b1(a3, b3, g3, a4, b4, g4)
+        dg4d34b3=dg2D12b1(a3, b3, g3, a4, b4, g4)
+
+        da3d34g3=dg3d34a3
+        db3d34g3=dg3d34b3
+        dg3d34g3=dg1D12g1(a3, b3, g3, a4, b4, g4)
+        da4d34g3 = dg2D12a1(a4, b4, g4, a3, b3, g3)
+        db4d34g3 = dg2D12b1(a4, b4, g4, a3, b3, g3)
+        dg4d34g3=dg2D12g1(a3, b3, g3, a4, b4, g4)
+
+        da3d34a4=da4d34a3
+        db3d34a4=da4d34b3
+        dg3d34a4=da4d34g3
+        da4d34a4 = da1D12a1(a4, b4, g4, a3, b3, g3)
+        db4d34a4 = db1D12a1(a4, b4, g4, a3, b3, g3)
+        dg4d34a4 = dg1D12a1(a4, b4, g4, a3, b3, g3)
+
+        da3d34b4=db4d34a3
+        db3d34b4=db4d34b3
+        dg3d34b4=db4d34g3
+        da4d34b4=db4d34a4
+        db4d34b4 = db1D12b1(a4, b4, g4, a3, b3, g3)
+        dg4d34b4 = dg1D12b1(a4, b4, g4, a3, b3, g3)
+
+        da3d34g4=dg4d34a3
+        db3d34g4=dg4d34b3
+        dg3d34g4=dg4d34g3
+        da4d34g4=dg4d34a4
+        db4d34g4=dg4d34b4
+        dg4d34g4 = dg1D12g1(a4, b4, g4, a3, b3, g3)
+
+
+        ### Spring 3-7 spring_arr[6]###
+        # D function
+        d37=D12(a3, b3, g3, a7, b7, g7)
+        # First derivatives of D function
+        da3d37=da1D12(a3, b3, g3, a7, b7, g7)
+        db3d37=db1D12(a3, b3, g3, a7, b7, g7)
+        dg3d37=dg1D12(a3, b3, g3, a7, b7, g7)
+        da7d37=da1D12(a7, b7, g7, a3, b3, g3)
+        db7d37=db1D12(a7, b7, g7, a3, b3, g3)
+        dg7d37=dg1D12(a7, b7, g7, a3, b3, g3)
+        # Second derivatives of D function
+        da3d37a3=da1D12a1(a3, b3, g3, a7, b7, g7)
+        db3d37a3=db1D12a1(a3, b3, g3, a7, b7, g7)
+        dg3d37a3=dg1D12a1(a3, b3, g3, a7, b7, g7)
+        da7d37a3=da2D12a1(a3, b3, g3, a7, b7, g7)
+        db7d37a3=db2D12a1(a3, b3, g3, a7, b7, g7)
+        dg7d37a3=dg2D12a1(a3, b3, g3, a7, b7, g7)
+        
+        da3d37b3=db3d37a3
+        db3d37b3=db1D12b1(a3, b3, g3, a7, b7, g7)
+        dg3d37b3=dg1D12b1(a3, b3, g3, a7, b7, g7)
+        da7d37b3 = db2D12a1(a7, b7, g7, a3, b3, g3)
+        db7d37b3=db2D12b1(a3, b3, g3, a7, b7, g7)
+        dg7d37b3=dg2D12b1(a3, b3, g3, a7, b7, g7)
+
+        da3d37g3=dg3d37a3
+        db3d37g3=dg3d37b3
+        dg3d37g3=dg1D12g1(a3, b3, g3, a7, b7, g7)
+        da7d37g3 = dg2D12a1(a7, b7, g7, a3, b3, g3)
+        db7d37g3 = dg2D12b1(a7, b7, g7, a3, b3, g3)
+        dg7d37g3=dg2D12g1(a3, b3, g3, a7, b7, g7)
+
+        da3d37a7=da7d37a3
+        db3d37a7=da7d37b3
+        dg3d37a7=da7d37g3
+        da7d37a7 = da1D12a1(a7, b7, g7, a3, b3, g3)
+        db7d37a7 = db1D12a1(a7, b7, g7, a3, b3, g3)
+        dg7d37a7 = dg1D12a1(a7, b7, g7, a3, b3, g3)
+
+        da3d37b7=db7d37a3
+        db3d37b7=db7d37b3
+        dg3d37b7=db7d37g3
+        da7d37b7=db7d37a7
+        db7d37b7 = db1D12b1(a7, b7, g7, a3, b3, g3)
+        dg7d37b7 = dg1D12b1(a7, b7, g7, a3, b3, g3)
+
+        da3d37g7=dg7d37a3
+        db3d37g7=dg7d37b3
+        dg3d37g7=dg7d37g3
+        da7d37g7=dg7d37a7
+        db7d37g7=dg7d37b7
+        dg7d37g7 = dg1D12g1(a7, b7, g7, a3, b3, g3)
+
+
+        ### Spring 4-8 spring_arr[7]###
+        # D function
+        d48=D12(a4, b4, g4, a8, b8, g8)
+        # First derivatives of D function
+        da4d48=da1D12(a4, b4, g4, a8, b8, g8)
+        db4d48=db1D12(a4, b4, g4, a8, b8, g8)
+        dg4d48=dg1D12(a4, b4, g4, a8, b8, g8)
+        da8d48=da1D12(a8, b8, g8, a4, b4, g4)
+        db8d48=db1D12(a8, b8, g8, a4, b4, g4)
+        dg8d48=dg1D12(a8, b8, g8, a4, b4, g4)
+        # Second derivatives of D function
+        da4d48a4=da1D12a1(a4, b4, g4, a8, b8, g8)
+        db4d48a4=db1D12a1(a4, b4, g4, a8, b8, g8)
+        dg4d48a4=dg1D12a1(a4, b4, g4, a8, b8, g8)
+        da8d48a4=da2D12a1(a4, b4, g4, a8, b8, g8)
+        db8d48a4=db2D12a1(a4, b4, g4, a8, b8, g8)
+        dg8d48a4=dg2D12a1(a4, b4, g4, a8, b8, g8)
+        
+        da4d48b4=db4d48a4
+        db4d48b4=db1D12b1(a4, b4, g4, a8, b8, g8)
+        dg4d48b4=dg1D12b1(a4, b4, g4, a8, b8, g8)
+        da8d48b4 = db2D12a1(a8, b8, g8, a4, b4, g4)
+        db8d48b4=db2D12b1(a4, b4, g4, a8, b8, g8)
+        dg8d48b4=dg2D12b1(a4, b4, g4, a8, b8, g8)
+
+        da4d48g4=dg4d48a4
+        db4d48g4=dg4d48b4
+        dg4d48g4=dg1D12g1(a4, b4, g4, a8, b8, g8)
+        da8d48g4 = dg2D12a1(a8, b8, g8, a4, b4, g4)
+        db8d48g4 = dg2D12b1(a8, b8, g8, a4, b4, g4)
+        dg8d48g4=dg2D12g1(a4, b4, g4, a8, b8, g8)
+
+        da4d48a8=da8d48a4
+        db4d48a8=da8d48b4
+        dg4d48a8=da8d48g4
+        da8d48a8 = da1D12a1(a8, b8, g8, a4, b4, g4)
+        db8d48a8 = db1D12a1(a8, b8, g8, a4, b4, g4)
+        dg8d48a8 = dg1D12a1(a8, b8, g8, a4, b4, g4)
+
+        da4d48b8=db8d48a4
+        db4d48b8=db8d48b4
+        dg4d48b8=db8d48g4
+        da8d48b8=db8d48a8
+        db8d48b8 = db1D12b1(a8, b8, g8, a4, b4, g4)
+        dg8d48b8 = dg1D12b1(a8, b8, g8, a4, b4, g4)
+
+        da4d48g8=dg8d48a4
+        db4d48g8=dg8d48b4
+        dg4d48g8=dg8d48g4
+        da8d48g8=dg8d48a8
+        db8d48g8=dg8d48b8
+        dg8d48g8 = dg1D12g1(a8, b8, g8, a4, b4, g4)
+
+
+        ### Spring 5-6 spring_arr[8]###
+        # D function
+        d56=D12(a5, b5, g5, a6, b6, g6)
+        # First derivatives of D function
+        da5d56=da1D12(a5, b5, g5, a6, b6, g6)
+        db5d56=db1D12(a5, b5, g5, a6, b6, g6)
+        dg5d56=dg1D12(a5, b5, g5, a6, b6, g6)
+        da6d56=da1D12(a6, b6, g6, a5, b5, g5)
+        db6d56=db1D12(a6, b6, g6, a5, b5, g5)
+        dg6d56=dg1D12(a6, b6, g6, a5, b5, g5)
+        # Second derivatives of D function
+        da5d56a5=da1D12a1(a5, b5, g5, a6, b6, g6)
+        db5d56a5=db1D12a1(a5, b5, g5, a6, b6, g6)
+        dg5d56a5=dg1D12a1(a5, b5, g5, a6, b6, g6)
+        da6d56a5=da2D12a1(a5, b5, g5, a6, b6, g6)
+        db6d56a5=db2D12a1(a5, b5, g5, a6, b6, g6)
+        dg6d56a5=dg2D12a1(a5, b5, g5, a6, b6, g6)
+        
+        da5d56b5=db5d56a5
+        db5d56b5=db1D12b1(a5, b5, g5, a6, b6, g6)
+        dg5d56b5=dg1D12b1(a5, b5, g5, a6, b6, g6)
+        da6d56b5 = db2D12a1(a6, b6, g6, a5, b5, g5)
+        db6d56b5=db2D12b1(a5, b5, g5, a6, b6, g6)
+        dg6d56b5=dg2D12b1(a5, b5, g5, a6, b6, g6)
+
+        da5d56g5=dg5d56a5
+        db5d56g5=dg5d56b5
+        dg5d56g5=dg1D12g1(a5, b5, g5, a6, b6, g6)
+        da6d56g5 = dg2D12a1(a6, b6, g6, a5, b5, g5)
+        db6d56g5 = dg2D12b1(a6, b6, g6, a5, b5, g5)
+        dg6d56g5=dg2D12g1(a5, b5, g5, a6, b6, g6)
+
+        da5d56a6=da6d56a5
+        db5d56a6=da6d56b5
+        dg5d56a6=da6d56g5
+        da6d56a6 = da1D12a1(a6, b6, g6, a5, b5, g5)
+        db6d56a6 = db1D12a1(a6, b6, g6, a5, b5, g5)
+        dg6d56a6 = dg1D12a1(a6, b6, g6, a5, b5, g5)
+
+        da5d56b6=db6d56a5
+        db5d56b6=db6d56b5
+        dg5d56b6=db6d56g5
+        da6d56b6=db6d56a6
+        db6d56b6 = db1D12b1(a6, b6, g6, a5, b5, g5)
+        dg6d56b6 = dg1D12b1(a6, b6, g6, a5, b5, g5)
+
+        da5d56g6=dg6d56a5
+        db5d56g6=dg6d56b5
+        dg5d56g6=dg6d56g5
+        da6d56g6=dg6d56a6
+        db6d56g6=dg6d56b6
+        dg6d56g6 = dg1D12g1(a6, b6, g6, a5, b5, g5)
+
+
+        ### Spring 5-7 spring_arr[9]###
+        # D function
+        d57=D12(a5, b5, g5, a7, b7, g7)
+        # First derivatives of D function
+        da5d57=da1D12(a5, b5, g5, a7, b7, g7)
+        db5d57=db1D12(a5, b5, g5, a7, b7, g7)
+        dg5d57=dg1D12(a5, b5, g5, a7, b7, g7)
+        da7d57=da1D12(a7, b7, g7, a5, b5, g5)
+        db7d57=db1D12(a7, b7, g7, a5, b5, g5)
+        dg7d57=dg1D12(a7, b7, g7, a5, b5, g5)
+        # Second derivatives of D function
+        da5d57a5=da1D12a1(a5, b5, g5, a7, b7, g7)
+        db5d57a5=db1D12a1(a5, b5, g5, a7, b7, g7)
+        dg5d57a5=dg1D12a1(a5, b5, g5, a7, b7, g7)
+        da7d57a5=da2D12a1(a5, b5, g5, a7, b7, g7)
+        db7d57a5=db2D12a1(a5, b5, g5, a7, b7, g7)
+        dg7d57a5=dg2D12a1(a5, b5, g5, a7, b7, g7)
+        
+        da5d57b5=db5d57a5
+        db5d57b5=db1D12b1(a5, b5, g5, a7, b7, g7)
+        dg5d57b5=dg1D12b1(a5, b5, g5, a7, b7, g7)
+        da7d57b5 = db2D12a1(a7, b7, g7, a5, b5, g5)
+        db7d57b5=db2D12b1(a5, b5, g5, a7, b7, g7)
+        dg7d57b5=dg2D12b1(a5, b5, g5, a7, b7, g7)
+
+        da5d57g5=dg5d57a5
+        db5d57g5=dg5d57b5
+        dg5d57g5=dg1D12g1(a5, b5, g5, a7, b7, g7)
+        da7d57g5 = dg2D12a1(a7, b7, g7, a5, b5, g5)
+        db7d57g5 = dg2D12b1(a7, b7, g7, a5, b5, g5)
+        dg7d57g5=dg2D12g1(a5, b5, g5, a7, b7, g7)
+
+        da5d57a7=da7d57a5
+        db5d57a7=da7d57b5
+        dg5d57a7=da7d57g5
+        da7d57a7 = da1D12a1(a7, b7, g7, a5, b5, g5)
+        db7d57a7 = db1D12a1(a7, b7, g7, a5, b5, g5)
+        dg7d57a7 = dg1D12a1(a7, b7, g7, a5, b5, g5)
+
+        da5d57b7=db7d57a5
+        db5d57b7=db7d57b5
+        dg5d57b7=db7d57g5
+        da7d57b7=db7d57a7
+        db7d57b7 = db1D12b1(a7, b7, g7, a5, b5, g5)
+        dg7d57b7 = dg1D12b1(a7, b7, g7, a5, b5, g5)
+
+        da5d57g7=dg7d57a5
+        db5d57g7=dg7d57b5
+        dg5d57g7=dg7d57g5
+        da7d57g7=dg7d57a7
+        db7d57g7=dg7d57b7
+        dg7d57g7 = dg1D12g1(a7, b7, g7, a5, b5, g5)
+
+
+        ### Spring 6-8 spring_arr[10]###
+        # D function
+        d68=D12(a6, b6, g6, a8, b8, g8)
+        # First derivatives of D function
+        da6d68=da1D12(a6, b6, g6, a8, b8, g8)
+        db6d68=db1D12(a6, b6, g6, a8, b8, g8)
+        dg6d68=dg1D12(a6, b6, g6, a8, b8, g8)
+        da8d68=da1D12(a8, b8, g8, a6, b6, g6)
+        db8d68=db1D12(a8, b8, g8, a6, b6, g6)
+        dg8d68=dg1D12(a8, b8, g8, a6, b6, g6)
+        # Second derivatives of D function
+        da6d68a6=da1D12a1(a6, b6, g6, a8, b8, g8)
+        db6d68a6=db1D12a1(a6, b6, g6, a8, b8, g8)
+        dg6d68a6=dg1D12a1(a6, b6, g6, a8, b8, g8)
+        da8d68a6=da2D12a1(a6, b6, g6, a8, b8, g8)
+        db8d68a6=db2D12a1(a6, b6, g6, a8, b8, g8)
+        dg8d68a6=dg2D12a1(a6, b6, g6, a8, b8, g8)
+        
+        da6d68b6=db6d68a6
+        db6d68b6=db1D12b1(a6, b6, g6, a8, b8, g8)
+        dg6d68b6=dg1D12b1(a6, b6, g6, a8, b8, g8)
+        da8d68b6 = db2D12a1(a8, b8, g8, a6, b6, g6)
+        db8d68b6=db2D12b1(a6, b6, g6, a8, b8, g8)
+        dg8d68b6=dg2D12b1(a6, b6, g6, a8, b8, g8)
+
+        da6d68g6=dg6d68a6
+        db6d68g6=dg6d68b6
+        dg6d68g6=dg1D12g1(a6, b6, g6, a8, b8, g8)
+        da8d68g6 = dg2D12a1(a8, b8, g8, a6, b6, g6)
+        db8d68g6 = dg2D12b1(a8, b8, g8, a6, b6, g6)
+        dg8d68g6=dg2D12g1(a6, b6, g6, a8, b8, g8)
+
+        da6d68a8=da8d68a6
+        db6d68a8=da8d68b6
+        dg6d68a8=da8d68g6
+        da8d68a8 = da1D12a1(a8, b8, g8, a6, b6, g6)
+        db8d68a8 = db1D12a1(a8, b8, g8, a6, b6, g6)
+        dg8d68a8 = dg1D12a1(a8, b8, g8, a6, b6, g6)
+
+        da6d68b8=db8d68a6
+        db6d68b8=db8d68b6
+        dg6d68b8=db8d68g6
+        da8d68b8=db8d68a8
+        db8d68b8 = db1D12b1(a8, b8, g8, a6, b6, g6)
+        dg8d68b8 = dg1D12b1(a8, b8, g8, a6, b6, g6)
+
+        da6d68g8=dg8d68a6
+        db6d68g8=dg8d68b6
+        dg6d68g8=dg8d68g6
+        da8d68g8=dg8d68a8
+        db8d68g8=dg8d68b8
+        dg8d68g8 = dg1D12g1(a8, b8, g8, a6, b6, g6)
+
+
+        ### Spring 7-8 spring_arr[11]###
+        # D function
+        d78=D12(a7, b7, g7, a8, b8, g8)
+        # First derivatives of D function
+        da7d78=da1D12(a7, b7, g7, a8, b8, g8)
+        db7d78=db1D12(a7, b7, g7, a8, b8, g8)
+        dg7d78=dg1D12(a7, b7, g7, a8, b8, g8)
+        da8d78=da1D12(a8, b8, g8, a7, b7, g7)
+        db8d78=db1D12(a8, b8, g8, a7, b7, g7)
+        dg8d78=dg1D12(a8, b8, g8, a7, b7, g7)
+        # Second derivatives of D function
+        da7d78a7=da1D12a1(a6, b6, g6, a8, b8, g8)
+        db7d78a7=db1D12a1(a6, b6, g6, a8, b8, g8)
+        dg7d78a7=dg1D12a1(a6, b6, g6, a8, b8, g8)
+        da8d78a7=da2D12a1(a6, b6, g6, a8, b8, g8)
+        db8d78a7=db2D12a1(a6, b6, g6, a8, b8, g8)
+        dg8d78a7=dg2D12a1(a6, b6, g6, a8, b8, g8)
+        
+        da7d78b7=db7d78a7
+        db7d78b7=db1D12b1(a6, b6, g6, a8, b8, g8)
+        dg7d78b7=dg1D12b1(a6, b6, g6, a8, b8, g8)
+        da8d78b7 = db2D12a1(a8, b8, g8, a6, b6, g6)
+        db8d78b7=db2D12b1(a6, b6, g6, a8, b8, g8)
+        dg8d78b7=dg2D12b1(a6, b6, g6, a8, b8, g8)
+
+        da7d78g7=dg7d78a7
+        db7d78g7=dg7d78b7
+        dg7d78g7=dg1D12g1(a6, b6, g6, a8, b8, g8)
+        da8d78g7 = dg2D12a1(a8, b8, g8, a6, b6, g6)
+        db8d78g7 = dg2D12b1(a8, b8, g8, a6, b6, g6)
+        dg8d78g7=dg2D12g1(a6, b6, g6, a8, b8, g8)
+
+        da7d78a8=da8d78a7
+        db7d78a8=da8d78b7
+        dg7d78a8=da8d78g7
+        da8d78a8 = da1D12a1(a8, b8, g8, a6, b6, g6)
+        db8d78a8 = db1D12a1(a8, b8, g8, a6, b6, g6)
+        dg8d78a8 = dg1D12a1(a8, b8, g8, a6, b6, g6)
+
+        da7d78b8=db8d78a7
+        db7d78b8=db8d78b7
+        dg7d78b8=db8d78g7
+        da8d78b8=db8d78a8
+        db8d78b8 = db1D12b1(a8, b8, g8, a6, b6, g6)
+        dg8d78b8 = dg1D12b1(a8, b8, g8, a6, b6, g6)
+
+        da7d78g8=dg8d78a7
+        db7d78g8=dg8d78b7
+        dg7d78g8=dg8d78g7
+        da8d78g8=dg8d78a8
+        db8d78g8=dg8d78b8
+        dg8d78g8 = dg1D12g1(a8, b8, g8, a6, b6, g6)
+        
+
+        return array([
+
+            # ---------- #
+            #     V1     #
+            # ---------- #
+            
+            # ad1 a1
+            [-spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*da1d12/(d12**2. - 1.) - da1d12a1) ) + 
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*da1d13/(d13**2. - 1.) - da1d13a1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*1.*sqrt( d15**2. - 1. ))*( (da1d15*da1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da1d15*0./1. + d15*da1d15*da1d15/(d15**2. - 1.) - da1d15a1) ),
+
+            # ad1 b1
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*db1d12/(d12**2. - 1.) - db1d12a1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*db1d13/(d13**2. - 1.) - db1d13a1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*1.*sqrt( d15**2. - 1. ))*( (da1d15*db1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da1d15*0./1. + d15*da1d15*db1d15/(d15**2. - 1.) - db1d15a1) ),
+
+            # ad1 g1
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*dg1d12/(d12**2. - 1.) - dg1d12a1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*dg1d13/(d13**2. - 1.) - dg1d13a1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*1.*sqrt( d15**2. - 1. ))*( (da1d15*dg1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da1d15*0./1. + d15*da1d15*dg1d15/(d15**2. - 1.) - dg1d15a1) ),
+
+            # ad1 a2,b2,g2
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*da2d12/(d12**2. - 1.) - da2d12a1) ),
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*db2d12/(d12**2. - 1.) - db2d12a1) ),
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*dg2d12/(d12**2. - 1.) - dg2d12a1) ),
+
+            # ad1 a3,b3,g3
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*da3d13/(d13**2. - 1.) - da3d13a1) ),
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*db3d13/(d13**2. - 1.) - db3d13a1) ),
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*dg3d13/(d13**2. - 1.) - dg3d13a1) ),
+
+            # ad1 a4,b4,g4
+            0.,0.,0.,
+
+            # ad1 a5,b5,g5
+            -spring_arr[2][0]/(mass_arr[0]*1.*sqrt( d15**2. - 1. ))*( (da1d15*da5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da1d15*0./1. + d15*da1d15*da5d15/(d15**2. - 1.) - da5d15a1) ),
+            -spring_arr[2][0]/(mass_arr[0]*1.*sqrt( d15**2. - 1. ))*( (da1d15*db5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da1d15*0./1. + d15*da1d15*db5d15/(d15**2. - 1.) - db5d15a1) ),
+            -spring_arr[2][0]/(mass_arr[0]*1.*sqrt( d15**2. - 1. ))*( (da1d15*dg5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da1d15*0./1. + d15*da1d15*dg5d15/(d15**2. - 1.) - dg5d15a1) ),
+
+            # ad1 a6,b6,g6
+            0.,0.,0.,
+
+            # ad1 a7,b7,g7
+            0.,0.,0.,
+
+            # ad1 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # bd1 a1
+            [-spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d12*db1d12*da1d12/(d12**2. - 1.) - da1d12b1) ) + 
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d13*db1d13*da1d13/(d13**2. - 1.) - da1d13b1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d15**2. - 1. ))*( (db1d15*da1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db1d15*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d15*db1d15*da1d15/(d15**2. - 1.) - da1d15b1) ),
+
+            # bd1 b1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db1d12/(d12**2. - 1.) - db1d12b1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*db1d13/(d13**2. - 1.) - db1d13b1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d15**2. - 1. ))*( (db1d15*db1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db1d15*0./(cosh(a1)*cosh(a1)) + d15*db1d15*db1d15/(d15**2. - 1.) - db1d15b1) ),
+
+            # bd1 g1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*dg1d12/(d12**2. - 1.) - dg1d12b1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*dg1d13/(d13**2. - 1.) - dg1d13b1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d15**2. - 1. ))*( (db1d15*dg1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db1d15*0./(cosh(a1)*cosh(a1)) + d15*db1d15*dg1d15/(d15**2. - 1.) - dg1d15b1) ),
+
+            # bd1 a2,b2,g2
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*da2d12/(d12**2. - 1.) - da2d12b1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db2d12/(d12**2. - 1.) - db2d12b1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*dg2d12/(d12**2. - 1.) - dg2d12b1) ),
+
+            # bd1 a3,b3,g3
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*da3d13/(d13**2. - 1.) - da3d13b1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*db3d13/(d13**2. - 1.) - db3d13b1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*dg3d13/(d13**2. - 1.) - dg3d13b1) ),
+
+            # bd1 a4,b4,g4
+            0.,0.,0.,
+
+            # bd1 a5,b5,g5
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d15**2. - 1. ))*( (db1d15*da5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db1d15*0./(cosh(a1)*cosh(a1)) + d15*db1d15*da5d15/(d15**2. - 1.) - da5d15b1) ),
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d15**2. - 1. ))*( (db1d15*db5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db1d15*0./(cosh(a1)*cosh(a1)) + d15*db1d15*db5d15/(d15**2. - 1.) - db5d15b1) ),
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d15**2. - 1. ))*( (db1d15*dg5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db1d15*0./(cosh(a1)*cosh(a1)) + d15*db1d15*dg5d15/(d15**2. - 1.) - dg5d15b1) ),
+
+            # bd1 a6,b6,g6
+            0.,0.,0.,
+
+            # bd1 a7,b7,g7
+            0.,0.,0.,
+
+            # bd1 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # gd1 a1
+            [-spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*sinh(2.*a1)*cosh(b1)*cosh(b1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*da1d12/(d12**2. - 1.) - da1d12g1) ) + 
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*sinh(2.*a1)*cosh(b1)*cosh(b1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*da1d13/(d13**2. - 1.) - da1d13g1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d15**2. - 1. ))*( (dg1d15*da1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg1d15*sinh(2.*a1)*cosh(b1)*cosh(b1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d15*dg1d15*da1d15/(d15**2. - 1.) - da1d15g1) ),
+
+            # gd1 b1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*sinh(2.*b1)*cosh(a1)*cosh(a1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*db1d12/(d12**2. - 1.) - db1d12g1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*sinh(2.*b1)*cosh(a1)*cosh(a1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*db1d13/(d13**2. - 1.) - db1d13g1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d15**2. - 1. ))*( (dg1d15*db1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg1d15*sinh(2.*b1)*cosh(a1)*cosh(a1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d15*dg1d15*db1d15/(d15**2. - 1.) - db1d15g1) ),
+
+            # gd1 g1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*dg1d12/(d12**2. - 1.) - dg1d12g1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*dg1d13/(d13**2. - 1.) - dg1d13g1) ) +
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d15**2. - 1. ))*( (dg1d15*dg1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg1d15*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d15*dg1d15*dg1d15/(d15**2. - 1.) - dg1d15g1) ),
+
+            # gd1 a2,b2,g2
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*da2d12/(d12**2. - 1.) - da2d12g1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*db2d12/(d12**2. - 1.) - db2d12g1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*dg2d12/(d12**2. - 1.) - dg2d12g1) ),
+
+            # gd1 a3,b3,g3
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*da3d13/(d13**2. - 1.) - da3d13g1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*db3d13/(d13**2. - 1.) - db3d13g1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*dg3d13/(d13**2. - 1.) - dg3d13g1) ),
+
+            # gd1 a4,b4,g4
+            0.,0.,0.,
+
+            # gd1 a5,b5,g5
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d15**2. - 1. ))*( (dg1d15*da5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg1d15*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d15*dg1d15*da5d15/(d15**2. - 1.) - da5d15g1) ),
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d15**2. - 1. ))*( (dg1d15*db5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg1d15*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d15*dg1d15*db5d15/(d15**2. - 1.) - db5d15g1) ),
+            -spring_arr[2][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d15**2. - 1. ))*( (dg1d15*dg5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg1d15*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d15*dg1d15*dg5d15/(d15**2. - 1.) - dg5d15g1) ),
+
+            # gd1 a6,b6,g6
+            0.,0.,0.,
+
+            # gd1 a7,b7,g7
+            0.,0.,0.,
+
+            # gd1 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+            #     V2     #
+            # ---------- #
+
+            # ad2 a1,b1,g1
+            [-spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*da1d12/(d12**2. - 1.) - da1d12a2) ),
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*db1d12/(d12**2. - 1.) - db1d12a2) ),
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*dg1d12/(d12**2. - 1.) - dg1d12a2) ),
+
+            # ad2 a2
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*da2d12/(d12**2. - 1.) - da2d12a2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*1.*sqrt( d24**2. - 1. ))*( (da2d24*da2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da2d24*0./1. + d24*da2d24*da2d24/(d24**2. - 1.) - da2d24a2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*1.*sqrt( d26**2. - 1. ))*( (da2d26*da2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da2d26*0./1. + d26*da2d26*da2d26/(d26**2. - 1.) - da2d26a2) ),
+
+            # ad2 b2
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*db2d12/(d12**2. - 1.) - db2d12a2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*1.*sqrt( d24**2. - 1. ))*( (da2d24*db2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da2d24*0./1. + d24*da2d24*db2d24/(d24**2. - 1.) - db2d24a2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*1.*sqrt( d26**2. - 1. ))*( (da2d26*db2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da2d26*0./1. + d26*da2d26*db2d26/(d26**2. - 1.) - db2d26a2) ),
+
+            # ad2 g2
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*dg2d12/(d12**2. - 1.) - dg2d12a2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*1.*sqrt( d24**2. - 1. ))*( (da2d24*dg2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da2d24*0./1. + d24*da2d24*dg2d24/(d24**2. - 1.) - dg2d24a2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*1.*sqrt( d26**2. - 1. ))*( (da2d26*dg2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da2d26*0./1. + d26*da2d26*dg2d26/(d26**2. - 1.) - dg2d26a2) ),
+
+            # ad2 a3,b3,g3
+            0.,0.,0.,
+
+            # ad2 a4,b4,g4
+            -spring_arr[3][0]/(mass_arr[1]*1.*sqrt( d24**2. - 1. ))*( (da2d24*da4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da2d24*0./1. + d24*da2d24*da4d24/(d24**2. - 1.) - da4d24a2) ),
+            -spring_arr[3][0]/(mass_arr[1]*1.*sqrt( d24**2. - 1. ))*( (da2d24*db4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da2d24*0./1. + d24*da2d24*db4d24/(d24**2. - 1.) - db4d24a2) ), 
+            -spring_arr[3][0]/(mass_arr[1]*1.*sqrt( d24**2. - 1. ))*( (da2d24*dg4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da2d24*0./1. + d24*da2d24*dg4d24/(d24**2. - 1.) - dg4d24a2) ),
+
+            # ad2 a5,b5,g5
+            0.,0.,0.,
+
+            # ad2 a6,b6,g6
+            -spring_arr[4][0]/(mass_arr[1]*1.*sqrt( d26**2. - 1. ))*( (da2d26*da6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da2d26*0./1. + d26*da2d26*da6d26/(d26**2. - 1.) - da6d26a2) ),
+            -spring_arr[4][0]/(mass_arr[1]*1.*sqrt( d26**2. - 1. ))*( (da2d26*db6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da2d26*0./1. + d26*da2d26*db6d26/(d26**2. - 1.) - db6d26a2) ),
+            -spring_arr[4][0]/(mass_arr[1]*1.*sqrt( d26**2. - 1. ))*( (da2d26*dg6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da2d26*0./1. + d26*da2d26*dg6d26/(d26**2. - 1.) - dg6d26a2) ),
+
+            # ad2 a7,b7,g7
+            0.,0.,0.,
+
+            # ad2 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # bd2 a1,b1,g1
+            [-spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*da1d12/(d12**2. - 1.) - da1d12b2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db1d12/(d12**2. - 1.) - db1d12b2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*dg1d12/(d12**2. - 1.) - dg1d12b2) ),
+
+            # bd2 a2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d12*db2d12*da2d12/(d12**2. - 1.) - da2d12b2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d24**2. - 1. ))*( (db2d24*da2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db2d24*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d24*db2d24*da2d24/(d24**2. - 1.) - da2d24b2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d26**2. - 1. ))*( (db2d26*da2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db2d26*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d26*db2d26*da2d26/(d26**2. - 1.) - da2d26b2) ),
+
+            # bd2 b2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db2d12/(d12**2. - 1.) - db2d12b2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d24**2. - 1. ))*( (db2d24*db2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db2d24*0./(cosh(a2)*cosh(a2)) + d24*db2d24*db2d24/(d24**2. - 1.) - db2d24b2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d26**2. - 1. ))*( (db2d26*db2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db2d26*0./(cosh(a2)*cosh(a2)) + d26*db2d26*db2d26/(d26**2. - 1.) - db2d26b2) ),
+
+            # bd2 g2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*dg2d12/(d12**2. - 1.) - dg2d12b2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d24**2. - 1. ))*( (db2d24*dg2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db2d24*0./(cosh(a2)*cosh(a2)) + d24*db2d24*dg2d24/(d24**2. - 1.) - dg2d24b2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d26**2. - 1. ))*( (db2d26*dg2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db2d26*0./(cosh(a2)*cosh(a2)) + d26*db2d26*dg2d26/(d26**2. - 1.) - dg2d26b2) ),
+
+            # bd2 a3,b3,g3
+            0.,0.,0.,
+
+            # bd2 a4,b4,g4
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d24**2. - 1. ))*( (db2d24*da4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db2d24*0./(cosh(a2)*cosh(a2)) + d24*db2d24*da4d24/(d24**2. - 1.) - da4d24b2) ), 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d24**2. - 1. ))*( (db2d24*db4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db2d24*0./(cosh(a2)*cosh(a2)) + d24*db2d24*db4d24/(d24**2. - 1.) - db4d24b2) ),
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d24**2. - 1. ))*( (db2d24*dg4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db2d24*0./(cosh(a2)*cosh(a2)) + d24*db2d24*dg4d24/(d24**2. - 1.) - dg4d24b2) ),
+
+            # bd2 a5,b5,g5
+            0.,0.,0.,
+
+            # bd2 a6
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d26**2. - 1. ))*( (db2d26*da6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db2d26*0./(cosh(a2)*cosh(a2)) + d26*db2d26*da6d26/(d26**2. - 1.) - da6d26b2) ),
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d26**2. - 1. ))*( (db2d26*db6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db2d26*0./(cosh(a2)*cosh(a2)) + d26*db2d26*db6d26/(d26**2. - 1.) - db6d26b2) ),
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d26**2. - 1. ))*( (db2d26*dg6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db2d26*0./(cosh(a2)*cosh(a2)) + d26*db2d26*dg6d26/(d26**2. - 1.) - dg6d26b2) ),
+
+            # bd2 a7,b7,g7
+            0.,0.,0.,
+
+            # bd2 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # gd2 a1,b1,g1
+            [-spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*da1d12/(d12**2. - 1.) - da1d12g2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*db1d12/(d12**2. - 1.) - db1d12g2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*dg1d12/(d12**2. - 1.) - dg1d12g2) ),
+
+            # gd2 a2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*sinh(2.*a2)*cosh(b2)*cosh(b2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*da2d12/(d12**2. - 1.) - da2d12g2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d24**2. - 1. ))*( (dg2d24*da2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg2d24*sinh(2.*a2)*cosh(b2)*cosh(b2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d24*dg2d24*da2d24/(d24**2. - 1.) - da2d24g2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d26**2. - 1. ))*( (dg2d26*da2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg2d26*sinh(2.*a2)*cosh(b2)*cosh(b2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d26*dg2d26*da2d26/(d26**2. - 1.) - da2d26g2) ),
+
+            # gd2 b2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*sinh(2.*b2)*cosh(a2)*cosh(a2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*db2d12/(d12**2. - 1.) - db2d12g2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d24**2. - 1. ))*( (dg2d24*db2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg2d24*sinh(2.*b2)*cosh(a2)*cosh(a2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d24*dg2d24*db2d24/(d24**2. - 1.) - db2d24g2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d26**2. - 1. ))*( (dg2d26*db2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg2d26*sinh(2.*b2)*cosh(a2)*cosh(a2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d26*dg2d26*db2d26/(d26**2. - 1.) - db2d26g2) ),
+
+            # gd2 g2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*dg2d12/(d12**2. - 1.) - dg2d12g2) ) + 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d24**2. - 1. ))*( (dg2d24*dg2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg2d24*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d24*dg2d24*dg2d24/(d24**2. - 1.) - dg2d24g2) ) +
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d26**2. - 1. ))*( (dg2d26*dg2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg2d26*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d26*dg2d26*dg2d26/(d26**2. - 1.) - dg2d26g2) ),
+
+            # gd2 a3,b3,g3
+            0.,0.,0.,
+
+            # gd2 a4,b4,g4 
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d24**2. - 1. ))*( (dg2d24*da4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg2d24*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d24*dg2d24*da4d24/(d24**2. - 1.) - da4d24g2) ),
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d24**2. - 1. ))*( (dg2d24*db4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg2d24*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d24*dg2d24*db4d24/(d24**2. - 1.) - db4d24g2) ),
+            -spring_arr[3][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d24**2. - 1. ))*( (dg2d24*dg4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg2d24*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d24*dg2d24*dg4d24/(d24**2. - 1.) - dg4d24g2) ),
+
+            # gd2 a5,b5,g5
+            0.,0.,0.,
+
+            # gd2 a6,b6,g6
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d26**2. - 1. ))*( (dg2d26*da6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg2d26*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d26*dg2d26*da6d26/(d26**2. - 1.) - da6d26g2) ),
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d26**2. - 1. ))*( (dg2d26*db6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg2d26*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d26*dg2d26*db6d26/(d26**2. - 1.) - db6d26g2) ),
+            -spring_arr[4][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d26**2. - 1. ))*( (dg2d26*dg6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg2d26*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d26*dg2d26*dg6d26/(d26**2. - 1.) - dg6d26g2) ),
+
+            # gd2 a7,b7,g7
+            0.,0.,0.,
+
+            # gd2 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+            #     V3     #
+            # ---------- #
+
+            # ad3 a1,b1,g1
+            [-spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*da1d13/(d13**2. - 1.) - da1d13a3) ),
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*db1d13/(d13**2. - 1.) - db1d13a3) ),
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*dg1d13/(d13**2. - 1.) - dg1d13a3) ),
+
+            # ad3 a2,b2,g2
+            0.,0.,0.,
+
+            # ad3 a3
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*da3d13/(d13**2. - 1.) - da3d13a3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*1.*sqrt( d34**2. - 1. ))*( (da3d34*da3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da3d34*0./1. + d34*da3d34*da3d34/(d34**2. - 1.) - da3d34a3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*1.*sqrt( d37**2. - 1. ))*( (da3d37*da3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da3d37*0./1. + d37*da3d37*da3d37/(d37**2. - 1.) - da3d37a3) ),
+
+            # ad3 b3
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*db3d13/(d13**2. - 1.) - db3d13a3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*1.*sqrt( d34**2. - 1. ))*( (da3d34*db3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da3d34*0./1. + d34*da3d34*db3d34/(d34**2. - 1.) - db3d34a3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*1.*sqrt( d37**2. - 1. ))*( (da3d37*db3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da3d37*0./1. + d37*da3d37*db3d37/(d37**2. - 1.) - db3d37a3) ),
+
+            # ad3 g3
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*dg3d13/(d13**2. - 1.) - dg3d13a3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*1.*sqrt( d34**2. - 1. ))*( (da3d34*dg3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da3d34*0./1. + d34*da3d34*dg3d34/(d34**2. - 1.) - dg3d34a3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*1.*sqrt( d37**2. - 1. ))*( (da3d37*dg3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da3d37*0./1. + d37*da3d37*dg3d37/(d37**2. - 1.) - dg3d37a3) ),
+
+            # ad3 a4,b4,g4
+            -spring_arr[5][0]/(mass_arr[2]*1.*sqrt( d34**2. - 1. ))*( (da3d34*da4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da3d34*0./1. + d34*da3d34*da4d34/(d34**2. - 1.) - da4d34a3) ),
+            -spring_arr[5][0]/(mass_arr[2]*1.*sqrt( d34**2. - 1. ))*( (da3d34*db4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da3d34*0./1. + d34*da3d34*db4d34/(d34**2. - 1.) - db4d34a3) ),
+            -spring_arr[5][0]/(mass_arr[2]*1.*sqrt( d34**2. - 1. ))*( (da3d34*dg4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da3d34*0./1. + d34*da3d34*dg4d34/(d34**2. - 1.) - dg4d34a3) ),
+
+            # ad3 a5,b5,g5
+            0.,0.,0.,
+
+            # ad3 a6,b6,g6
+            0.,0.,0.,
+
+            # ad3 a7,b7,g7
+            -spring_arr[6][0]/(mass_arr[2]*1.*sqrt( d37**2. - 1. ))*( (da3d37*da7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da3d37*0./1. + d37*da3d37*da7d37/(d37**2. - 1.) - da7d37a3) ),
+            -spring_arr[6][0]/(mass_arr[2]*1.*sqrt( d37**2. - 1. ))*( (da3d37*db7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da3d37*0./1. + d37*da3d37*db7d37/(d37**2. - 1.) - db7d37a3) ),
+            -spring_arr[6][0]/(mass_arr[2]*1.*sqrt( d37**2. - 1. ))*( (da3d37*dg7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da3d37*0./1. + d37*da3d37*dg7d37/(d37**2. - 1.) - dg7d37a3) ),
+
+            # ad3 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # bd3 a1,b1,g1
+            [-spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*da1d13/(d13**2. - 1.) - da1d13b3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*db1d13/(d13**2. - 1.) - db1d13b3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*dg1d13/(d13**2. - 1.) - dg1d13b3) ),
+
+            # bd3 a2,b2,g2
+            0.,0.,0.,
+
+            # bd3 a3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*sinh(2.*a3)/(cosh(a3)*cosh(a3)) + d13*db3d13*da3d13/(d13**2. - 1.) - da3d13b3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d34**2. - 1. ))*( (db3d34*da3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db3d34*sinh(2.*a3)/(cosh(a3)*cosh(a3)) + d34*db3d34*da3d34/(d34**2. - 1.) - da3d34b3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d37**2. - 1. ))*( (db3d37*da3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db3d37*sinh(2.*a3)/(cosh(a3)*cosh(a3)) + d37*db3d37*da3d37/(d37**2. - 1.) - da3d37b3) ),
+
+            # bd3 b3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*db3d13/(d13**2. - 1.) - db3d13b3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d34**2. - 1. ))*( (db3d34*db3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db3d34*0./(cosh(a3)*cosh(a3)) + d34*db3d34*db3d34/(d34**2. - 1.) - db3d34b3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d37**2. - 1. ))*( (db3d37*db3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db3d37*0./(cosh(a3)*cosh(a3)) + d37*db3d37*db3d37/(d37**2. - 1.) - db3d37b3) ),
+
+            # bd3 g3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*dg3d13/(d13**2. - 1.) - dg3d13b3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d34**2. - 1. ))*( (db3d34*dg3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db3d34*0./(cosh(a3)*cosh(a3)) + d34*db3d34*dg3d34/(d34**2. - 1.) - dg3d34b3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d37**2. - 1. ))*( (db3d37*dg3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db3d37*0./(cosh(a3)*cosh(a3)) + d37*db3d37*dg3d37/(d37**2. - 1.) - dg3d37b3) ),
+
+            # bd3 a4,b4,g4
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d34**2. - 1. ))*( (db3d34*da4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db3d34*0./(cosh(a3)*cosh(a3)) + d34*db3d34*da4d34/(d34**2. - 1.) - da4d34b3) ),
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d34**2. - 1. ))*( (db3d34*db4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db3d34*0./(cosh(a3)*cosh(a3)) + d34*db3d34*db4d34/(d34**2. - 1.) - db4d34b3) ),
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d34**2. - 1. ))*( (db3d34*dg4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db3d34*0./(cosh(a3)*cosh(a3)) + d34*db3d34*dg4d34/(d34**2. - 1.) - dg4d34b3) ),
+
+            # bd3 a5,b5,g5
+            0.,0.,0.,
+
+            # bd3 a6
+            0.,0.,0.,
+
+            # bd3 a7,b7,g7
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d37**2. - 1. ))*( (db3d37*da7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db3d37*0./(cosh(a3)*cosh(a3)) + d37*db3d37*da7d37/(d37**2. - 1.) - da7d37b3) ),
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d37**2. - 1. ))*( (db3d37*db7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db3d37*0./(cosh(a3)*cosh(a3)) + d37*db3d37*db7d37/(d37**2. - 1.) - db7d37b3) ),
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d37**2. - 1. ))*( (db3d37*dg7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db3d37*0./(cosh(a3)*cosh(a3)) + d37*db3d37*dg7d37/(d37**2. - 1.) - dg7d37b3) ),
+
+            # bd3 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # gd3 a1,b1,g1
+            [-spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*da1d13/(d13**2. - 1.) - da1d13g3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*db1d13/(d13**2. - 1.) - db1d13g3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*dg1d13/(d13**2. - 1.) - dg1d13g3) ),
+
+            # gd3 a2,b2,g2
+            0.,0.,0.,
+
+            # gd3 a3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*sinh(2.*a3)*cosh(b3)*cosh(b3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*da3d13/(d13**2. - 1.) - da3d13g3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d34**2. - 1. ))*( (dg3d34*da3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg3d34*sinh(2.*a3)*cosh(b3)*cosh(b3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d34*dg3d34*da3d34/(d34**2. - 1.) - da3d34g3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d37**2. - 1. ))*( (dg3d37*da3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg3d37*sinh(2.*a3)*cosh(b3)*cosh(b3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d37*dg3d37*da3d37/(d37**2. - 1.) - da3d37g3) ),
+
+            # gd3 b3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*sinh(2.*b3)*cosh(a3)*cosh(a3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*db3d13/(d13**2. - 1.) - db3d13g3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d34**2. - 1. ))*( (dg3d34*db3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg3d34*sinh(2.*b3)*cosh(a3)*cosh(a3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d34*dg3d34*db3d34/(d34**2. - 1.) - db3d34g3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d37**2. - 1. ))*( (dg3d37*db3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg3d37*sinh(2.*b3)*cosh(a3)*cosh(a3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d37*dg3d37*db3d37/(d37**2. - 1.) - db3d37g3) ),
+
+            # gd3 g3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*dg3d13/(d13**2. - 1.) - dg3d13g3) ) + 
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d34**2. - 1. ))*( (dg3d34*dg3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg3d34*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d34*dg3d34*dg3d34/(d34**2. - 1.) - dg3d34g3) ) +
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d37**2. - 1. ))*( (dg3d37*dg3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg3d37*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d37*dg3d37*dg3d37/(d37**2. - 1.) - dg3d37g3) ),
+
+            # gd3 a4,b4,g4
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d34**2. - 1. ))*( (dg3d34*da4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg3d34*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d34*dg3d34*da4d34/(d34**2. - 1.) - da4d34g3) ),
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d34**2. - 1. ))*( (dg3d34*db4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg3d34*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d34*dg3d34*db4d34/(d34**2. - 1.) - db4d34g3) ),
+            -spring_arr[5][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d34**2. - 1. ))*( (dg3d34*dg4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg3d34*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d34*dg3d34*dg4d34/(d34**2. - 1.) - dg4d34g3) ),
+
+            # gd3 a5,b5,g5
+            0.,0.,0.,
+
+            # gd3 a6,b6,g6
+            0.,0.,0.,
+
+            # gd3 a7,b7,g7
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d37**2. - 1. ))*( (dg3d37*da7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg3d37*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d37*dg3d37*da7d37/(d37**2. - 1.) - da7d37g3) ),
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d37**2. - 1. ))*( (dg3d37*db7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg3d37*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d37*dg3d37*db7d37/(d37**2. - 1.) - db7d37g3) ),
+            -spring_arr[6][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d37**2. - 1. ))*( (dg3d37*dg7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg3d37*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d37*dg3d37*dg7d37/(d37**2. - 1.) - dg7d37g3) ),
+
+            # gd3 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+            #     V4     #
+            # ---------- #
+
+            # ad4 a1,b1,g1
+            [0.,0.,0.,
+
+            # ad4 a2,b2,g2
+            -spring_arr[3][0]/(mass_arr[3]*1.*sqrt( d24**2. - 1. ))*( (da4d24*da2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da4d24*0./1. + d24*da4d24*da2d24/(d24**2. - 1.) - da2d24a4) ),
+            -spring_arr[3][0]/(mass_arr[3]*1.*sqrt( d24**2. - 1. ))*( (da4d24*db2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da4d24*0./1. + d24*da4d24*db2d24/(d24**2. - 1.) - db2d24a4) ),
+            -spring_arr[3][0]/(mass_arr[3]*1.*sqrt( d24**2. - 1. ))*( (da4d24*dg2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da4d24*0./1. + d24*da4d24*dg2d24/(d24**2. - 1.) - dg2d24a4) ),
+
+            # ad4 a3,b3,g3
+            -spring_arr[5][0]/(mass_arr[3]*1.*sqrt( d34**2. - 1. ))*( (da4d34*da3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da4d34*0./1. + d34*da4d34*da3d34/(d34**2. - 1.) - da3d34a4) ),
+            -spring_arr[5][0]/(mass_arr[3]*1.*sqrt( d34**2. - 1. ))*( (da4d34*db3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da4d34*0./1. + d34*da4d34*db3d34/(d34**2. - 1.) - db3d34a4) ),
+            -spring_arr[5][0]/(mass_arr[3]*1.*sqrt( d34**2. - 1. ))*( (da4d34*dg3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da4d34*0./1. + d34*da4d34*dg3d34/(d34**2. - 1.) - dg3d34a4) ),
+
+            # ad4 a4
+            -spring_arr[3][0]/(mass_arr[3]*1.*sqrt( d24**2. - 1. ))*( (da4d24*da4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da4d24*0./1. + d24*da4d24*da4d24/(d24**2. - 1.) - da4d24a4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*1.*sqrt( d34**2. - 1. ))*( (da4d34*da4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da4d34*0./1. + d34*da4d34*da4d34/(d34**2. - 1.) - da4d34a4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*1.*sqrt( d48**2. - 1. ))*( (da4d48*da4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da4d48*0./1. + d48*da4d48*da4d48/(d48**2. - 1.) - da4d48a4) ),
+
+            # ad4 b4
+            -spring_arr[3][0]/(mass_arr[3]*1.*sqrt( d24**2. - 1. ))*( (da4d24*db4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da4d24*0./1. + d24*da4d24*db4d24/(d24**2. - 1.) - db4d24a4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*1.*sqrt( d34**2. - 1. ))*( (da4d34*db4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da4d34*0./1. + d34*da4d34*db4d34/(d34**2. - 1.) - db4d34a4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*1.*sqrt( d48**2. - 1. ))*( (da4d48*db4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da4d48*0./1. + d48*da4d48*db4d48/(d48**2. - 1.) - db4d48a4) ),
+
+            # ad4 g4
+            -spring_arr[3][0]/(mass_arr[3]*1.*sqrt( d24**2. - 1. ))*( (da4d24*dg4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(da4d24*0./1. + d24*da4d24*dg4d24/(d24**2. - 1.) - dg4d24a4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*1.*sqrt( d34**2. - 1. ))*( (da4d34*dg4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(da4d34*0./1. + d34*da4d34*dg4d34/(d34**2. - 1.) - dg4d34a4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*1.*sqrt( d48**2. - 1. ))*( (da4d48*dg4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da4d48*0./1. + d48*da4d48*dg4d48/(d48**2. - 1.) - dg4d48a4) ),
+
+            # ad4 a5,b5,g5
+            0.,0.,0.,
+
+            # ad4 a6,b6,g6
+            0.,0.,0.,
+
+            # ad4 a7,b7,g7
+            0.,0.,0.,
+
+            # ad4 a8,b8,g8
+            -spring_arr[7][0]/(mass_arr[3]*1.*sqrt( d48**2. - 1. ))*( (da4d48*da8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da4d48*0./1. + d48*da4d48*da8d48/(d48**2. - 1.) - da8d48a4) ),
+            -spring_arr[7][0]/(mass_arr[3]*1.*sqrt( d48**2. - 1. ))*( (da4d48*db8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da4d48*0./1. + d48*da4d48*db8d48/(d48**2. - 1.) - db8d48a4) ),
+            -spring_arr[7][0]/(mass_arr[3]*1.*sqrt( d48**2. - 1. ))*( (da4d48*dg8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da4d48*0./1. + d48*da4d48*dg8d48/(d48**2. - 1.) - dg8d48a4) )],
+
+            # ---------- #
+
+            # bd4 a1,b1,g1
+            [0.,0.,0.,
+
+            # bd4 a2,b2,g2
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d24**2. - 1. ))*( (db4d24*da2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db4d24*0./(cosh(a4)*cosh(a4)) + d24*db4d24*da2d24/(d24**2. - 1.) - da2d24b4) ),
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d24**2. - 1. ))*( (db4d24*db2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db4d24*0./(cosh(a4)*cosh(a4)) + d24*db4d24*db2d24/(d24**2. - 1.) - db2d24b4) ),
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d24**2. - 1. ))*( (db4d24*dg2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db4d24*0./(cosh(a4)*cosh(a4)) + d24*db4d24*dg2d24/(d24**2. - 1.) - dg2d24b4) ),
+
+            # bd4 a3,b3,g3
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d34**2. - 1. ))*( (db4d34*da3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db4d34*0./(cosh(a4)*cosh(a4)) + d34*db4d34*da3d34/(d34**2. - 1.) - da3d34b4) ),
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d34**2. - 1. ))*( (db4d34*db3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db4d34*0./(cosh(a4)*cosh(a4)) + d34*db4d34*db3d34/(d34**2. - 1.) - db3d34b4) ),
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d34**2. - 1. ))*( (db4d34*dg3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db4d34*0./(cosh(a4)*cosh(a4)) + d34*db4d34*dg3d34/(d34**2. - 1.) - dg3d34b4) ),
+
+            # bd4 a4
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d24**2. - 1. ))*( (db4d24*da4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db4d24*sinh(2.*a4)/(cosh(a4)*cosh(a4)) + d24*db4d24*da4d24/(d24**2. - 1.) - da4d24b4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d34**2. - 1. ))*( (db4d34*da4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db4d34*sinh(2.*a4)/(cosh(a4)*cosh(a4)) + d34*db4d34*da4d34/(d34**2. - 1.) - da4d34b4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d48**2. - 1. ))*( (db4d48*da4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db4d48*sinh(2.*a4)/(cosh(a4)*cosh(a4)) + d48*db4d48*da4d48/(d48**2. - 1.) - da4d48b4) ),
+
+            # bd4 b4
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d24**2. - 1. ))*( (db4d24*db4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db4d24*0./(cosh(a4)*cosh(a4)) + d24*db4d24*db4d24/(d24**2. - 1.) - db4d24b4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d34**2. - 1. ))*( (db4d34*db4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db4d34*0./(cosh(a4)*cosh(a4)) + d34*db4d34*db4d34/(d34**2. - 1.) - db4d34b4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d48**2. - 1. ))*( (db4d48*db4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db4d48*0./(cosh(a4)*cosh(a4)) + d48*db4d48*db4d48/(d48**2. - 1.) - db4d48b4) ),
+
+            # bd4 g4
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d24**2. - 1. ))*( (db4d24*dg4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(db4d24*0./(cosh(a4)*cosh(a4)) + d24*db4d24*dg4d24/(d24**2. - 1.) - dg4d24b4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d34**2. - 1. ))*( (db4d34*dg4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(db4d34*0./(cosh(a4)*cosh(a4)) + d34*db4d34*dg4d34/(d34**2. - 1.) - dg4d34b4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d48**2. - 1. ))*( (db4d48*dg4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db4d48*0./(cosh(a4)*cosh(a4)) + d48*db4d48*dg4d48/(d48**2. - 1.) - dg4d48b4) ),
+
+            # bd4 a5,b5,g5
+            0.,0.,0.,
+
+            # bd4 a6,b6,g6
+            0.,0.,0.,
+
+            # bd4 a7,b7,g7
+            0.,0.,0.,
+
+            # bd4 a8,b8,g8
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d48**2. - 1. ))*( (db4d48*da8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db4d48*0./(cosh(a4)*cosh(a4)) + d48*db4d48*da8d48/(d48**2. - 1.) - da8d48b4) ),
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d48**2. - 1. ))*( (db4d48*db8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db4d48*0./(cosh(a4)*cosh(a4)) + d48*db4d48*db8d48/(d48**2. - 1.) - db8d48b4) ),
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*sqrt( d48**2. - 1. ))*( (db4d48*dg8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db4d48*0./(cosh(a4)*cosh(a4)) + d48*db4d48*dg8d48/(d48**2. - 1.) - dg8d48b4) )],
+
+            # ---------- #
+
+            # gd4 a1,b1,g1
+            [0.,0.,0.,
+
+            # gd4 a2,b2,g2
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d24**2. - 1. ))*( (dg4d24*da2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg4d24*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d24*dg4d24*da2d24/(d24**2. - 1.) - da2d24g4) ),
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d24**2. - 1. ))*( (dg4d24*db2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg4d24*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d24*dg4d24*db2d24/(d24**2. - 1.) - db2d24g4) ),
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d24**2. - 1. ))*( (dg4d24*dg2d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg4d24*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d24*dg4d24*dg2d24/(d24**2. - 1.) - dg2d24g4) ),
+
+            # gd4 a3,b3,g3
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d34**2. - 1. ))*( (dg4d34*da3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg4d34*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d34*dg4d34*da3d34/(d34**2. - 1.) - da3d34g4) ),
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d34**2. - 1. ))*( (dg4d34*db3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg4d34*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d34*dg4d34*db3d34/(d34**2. - 1.) - db3d34g4) ),
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d34**2. - 1. ))*( (dg4d34*dg3d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg4d34*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d34*dg4d34*dg3d34/(d34**2. - 1.) - dg3d34g4) ),
+
+            # gd4 a4
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d24**2. - 1. ))*( (dg4d24*da4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg4d24*sinh(2.*a4)*cosh(b4)*cosh(b4)/(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d24*dg4d24*da4d24/(d24**2. - 1.) - da4d24g4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d34**2. - 1. ))*( (dg4d34*da4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg4d34*sinh(2.*a4)*cosh(b4)*cosh(b4)/(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d34*dg4d34*da4d34/(d34**2. - 1.) - da4d34g4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d48**2. - 1. ))*( (dg4d48*da4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg4d48*sinh(2.*a4)*cosh(b4)*cosh(b4)/(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d48*dg4d48*da4d48/(d48**2. - 1.) - da4d48g4) ),
+
+            # gd4 b4
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d24**2. - 1. ))*( (dg4d24*db4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg4d24*sinh(2.*b4)*cosh(a4)*cosh(a4)/(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d24*dg4d24*db4d24/(d24**2. - 1.) - db4d24g4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d34**2. - 1. ))*( (dg4d34*db4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg4d34*sinh(2.*b4)*cosh(a4)*cosh(a4)/(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d34*dg4d34*db4d34/(d34**2. - 1.) - db4d34g4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d48**2. - 1. ))*( (dg4d48*db4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg4d48*sinh(2.*b4)*cosh(a4)*cosh(a4)/(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d48*dg4d48*db4d48/(d48**2. - 1.) - db4d48g4) ),
+
+            # gd4 g4
+            -spring_arr[3][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d24**2. - 1. ))*( (dg4d24*dg4d24)/sqrt( d24**2. - 1.) - ( arccosh(d24) - spring_arr[3][1] )*(dg4d24*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d24*dg4d24*dg4d24/(d24**2. - 1.) - dg4d24g4) ) + 
+            -spring_arr[5][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d34**2. - 1. ))*( (dg4d34*dg4d34)/sqrt( d34**2. - 1.) - ( arccosh(d34) - spring_arr[5][1] )*(dg4d34*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d34*dg4d34*dg4d34/(d34**2. - 1.) - dg4d34g4) ) +
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d48**2. - 1. ))*( (dg4d48*dg4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg4d48*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d48*dg4d48*dg4d48/(d48**2. - 1.) - dg4d48g4) ),
+
+            # gd4 a5,b5,g5
+            0.,0.,0.,
+
+            # gd4 a6,b6,g6
+            0.,0.,0.,
+
+            # gd4 a7,b7,g7
+            0.,0.,0.,
+
+            # gd4 a8,b8,g8
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d48**2. - 1. ))*( (dg4d48*da8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg4d48*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d48*dg4d48*da8d48/(d48**2. - 1.) - da8d48g4) ),
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d48**2. - 1. ))*( (dg4d48*db8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg4d48*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d48*dg4d48*db8d48/(d48**2. - 1.) - db8d48g4) ),
+            -spring_arr[7][0]/(mass_arr[3]*cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)*sqrt( d48**2. - 1. ))*( (dg4d48*dg8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg4d48*0./(cosh(a4)*cosh(a4)*cosh(b4)*cosh(b4)) + d48*dg4d48*dg8d48/(d48**2. - 1.) - dg8d48g4) )],
+
+            # ---------- #
+            #     V5     #
+            # ---------- #
+
+            # ad5 a1,b1,g1
+            [-spring_arr[2][0]/(mass_arr[4]*1.*sqrt( d15**2. - 1. ))*( (da5d15*da1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da5d15*0./1. + d15*da5d15*da1d15/(d15**2. - 1.) - da1d15a5) ), 
+            -spring_arr[2][0]/(mass_arr[4]*1.*sqrt( d15**2. - 1. ))*( (da5d15*db1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da5d15*0./1. + d15*da5d15*db1d15/(d15**2. - 1.) - db1d15a5) ),
+            -spring_arr[2][0]/(mass_arr[4]*1.*sqrt( d15**2. - 1. ))*( (da5d15*dg1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da5d15*0./1. + d15*da5d15*dg1d15/(d15**2. - 1.) - dg1d15a5) ),
+
+            # ad5 a2,b2,g2
+            0.,0.,0.,
+
+            # ad5 a3,b3,g3
+            0.,0.,0.,
+
+            # ad5 a4,b4,g4
+            0.,0.,0.,
+
+            # ad5 a5
+            -spring_arr[2][0]/(mass_arr[4]*1.*sqrt( d15**2. - 1. ))*( (da5d15*da5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da5d15*0./1. + d15*da5d15*da5d15/(d15**2. - 1.) - da5d15a5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*1.*sqrt( d56**2. - 1. ))*( (da5d56*da5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da5d56*0./1. + d56*da5d56*da5d56/(d56**2. - 1.) - da5d56a5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*1.*sqrt( d57**2. - 1. ))*( (da5d57*da5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da5d57*0./1. + d57*da5d57*da5d57/(d57**2. - 1.) - da5d57a5) ),
+
+            # ad5 b5
+            -spring_arr[2][0]/(mass_arr[4]*1.*sqrt( d15**2. - 1. ))*( (da5d15*db5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da5d15*0./1. + d15*da5d15*db5d15/(d15**2. - 1.) - db5d15a5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*1.*sqrt( d56**2. - 1. ))*( (da5d56*db5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da5d56*0./1. + d56*da5d56*db5d56/(d56**2. - 1.) - db5d56a5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*1.*sqrt( d57**2. - 1. ))*( (da5d57*db5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da5d57*0./1. + d57*da5d57*db5d57/(d57**2. - 1.) - db5d57a5) ),
+
+            # ad5 g5
+            -spring_arr[2][0]/(mass_arr[4]*1.*sqrt( d15**2. - 1. ))*( (da5d15*dg5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(da5d15*0./1. + d15*da5d15*dg5d15/(d15**2. - 1.) - dg5d15a5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*1.*sqrt( d56**2. - 1. ))*( (da5d56*dg5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da5d56*0./1. + d56*da5d56*dg5d56/(d56**2. - 1.) - dg5d56a5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*1.*sqrt( d57**2. - 1. ))*( (da5d57*dg5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da5d57*0./1. + d57*da5d57*dg5d57/(d57**2. - 1.) - dg5d57a5) ),
+
+            # ad5 a6,b6,g6
+            -spring_arr[8][0]/(mass_arr[4]*1.*sqrt( d56**2. - 1. ))*( (da5d56*da6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da5d56*0./1. + d56*da5d56*da6d56/(d56**2. - 1.) - da6d56a5) ), 
+            -spring_arr[8][0]/(mass_arr[4]*1.*sqrt( d56**2. - 1. ))*( (da5d56*db6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da5d56*0./1. + d56*da5d56*db6d56/(d56**2. - 1.) - db6d56a5) ),
+            -spring_arr[8][0]/(mass_arr[4]*1.*sqrt( d56**2. - 1. ))*( (da5d56*dg6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da5d56*0./1. + d56*da5d56*dg6d56/(d56**2. - 1.) - dg6d56a5) ),
+
+            # ad5 a7,b7,g7
+            -spring_arr[9][0]/(mass_arr[4]*1.*sqrt( d57**2. - 1. ))*( (da5d57*da7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da5d57*0./1. + d57*da5d57*da7d57/(d57**2. - 1.) - da7d57a5) ), 
+            -spring_arr[9][0]/(mass_arr[4]*1.*sqrt( d57**2. - 1. ))*( (da5d57*db7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da5d57*0./1. + d57*da5d57*db7d57/(d57**2. - 1.) - db7d57a5) ),
+            -spring_arr[9][0]/(mass_arr[4]*1.*sqrt( d57**2. - 1. ))*( (da5d57*dg7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da5d57*0./1. + d57*da5d57*dg7d57/(d57**2. - 1.) - dg7d57a5) ),
+
+            # ad5 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # bd5 a1,b1,g1
+            [-spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d15**2. - 1. ))*( (db5d15*da1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db5d15*0./(cosh(a5)*cosh(a5)) + d15*db5d15*da1d15/(d15**2. - 1.) - da1d15b5) ), 
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d15**2. - 1. ))*( (db5d15*db1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db5d15*0./(cosh(a5)*cosh(a5)) + d15*db5d15*db1d15/(d15**2. - 1.) - db1d15b5) ),
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d15**2. - 1. ))*( (db5d15*dg1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db5d15*0./(cosh(a5)*cosh(a5)) + d15*db5d15*dg1d15/(d15**2. - 1.) - dg1d15b5) ),
+
+            # bd5 a2,b2,g2
+            0.,0.,0.,
+
+            # bd5 a3,b3,g3
+            0.,0.,0.,
+
+            # bd5 a4,b4,g4
+            0.,0.,0.,
+
+            # bd5 a5
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d15**2. - 1. ))*( (db5d15*da5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db5d15*sinh(2.*a5)/(cosh(a5)*cosh(a5)) + d15*db5d15*da5d15/(d15**2. - 1.) - da5d15b5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d56**2. - 1. ))*( (db5d56*da5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db5d56*sinh(2.*a5)/(cosh(a5)*cosh(a5)) + d56*db5d56*da5d56/(d56**2. - 1.) - da5d56b5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d57**2. - 1. ))*( (db5d57*da5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db5d57*sinh(2.*a5)/(cosh(a5)*cosh(a5)) + d57*db5d57*da5d57/(d57**2. - 1.) - da5d57b5) ),
+
+            # bd5 b5
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d15**2. - 1. ))*( (db5d15*db5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db5d15*0./(cosh(a5)*cosh(a5)) + d15*db5d15*db5d15/(d15**2. - 1.) - db5d15b5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d56**2. - 1. ))*( (db5d56*db5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db5d56*0./(cosh(a5)*cosh(a5)) + d56*db5d56*db5d56/(d56**2. - 1.) - db5d56b5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d57**2. - 1. ))*( (db5d57*db5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db5d57*0./(cosh(a5)*cosh(a5)) + d57*db5d57*db5d57/(d57**2. - 1.) - db5d57b5) ),
+
+            # bd5 g5
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d15**2. - 1. ))*( (db5d15*dg5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(db5d15*0./(cosh(a5)*cosh(a5)) + d15*db5d15*dg5d15/(d15**2. - 1.) - dg5d15b5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d56**2. - 1. ))*( (db5d56*dg5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db5d56*0./(cosh(a5)*cosh(a5)) + d56*db5d56*dg5d56/(d56**2. - 1.) - dg5d56b5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d57**2. - 1. ))*( (db5d57*dg5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db5d57*0./(cosh(a5)*cosh(a5)) + d57*db5d57*dg5d57/(d57**2. - 1.) - dg5d57b5) ),
+
+            # bd5 a6,b6,g6
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d56**2. - 1. ))*( (db5d56*da6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db5d56*0./(cosh(a5)*cosh(a5)) + d56*db5d56*da6d56/(d56**2. - 1.) - da6d56b5) ), 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d56**2. - 1. ))*( (db5d56*db6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db5d56*0./(cosh(a5)*cosh(a5)) + d56*db5d56*db6d56/(d56**2. - 1.) - db6d56b5) ),
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d56**2. - 1. ))*( (db5d56*dg6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db5d56*0./(cosh(a5)*cosh(a5)) + d56*db5d56*dg6d56/(d56**2. - 1.) - dg6d56b5) ),
+
+            # bd5 a7,b7,g7
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d57**2. - 1. ))*( (db5d57*da7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db5d57*0./(cosh(a5)*cosh(a5)) + d57*db5d57*da7d57/(d57**2. - 1.) - da7d57b5) ), 
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d57**2. - 1. ))*( (db5d57*db7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db5d57*0./(cosh(a5)*cosh(a5)) + d57*db5d57*db7d57/(d57**2. - 1.) - db7d57b5) ),
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*sqrt( d57**2. - 1. ))*( (db5d57*dg7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db5d57*0./(cosh(a5)*cosh(a5)) + d57*db5d57*dg7d57/(d57**2. - 1.) - dg7d57b5) ),
+
+            # bd5 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+
+            # gd5 a1,b1,g1
+            [-spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d15**2. - 1. ))*( (dg5d15*da1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg5d15*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d15*dg5d15*da1d15/(d15**2. - 1.) - da1d15g5) ), 
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d15**2. - 1. ))*( (dg5d15*db1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg5d15*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d15*dg5d15*db1d15/(d15**2. - 1.) - db1d15g5) ),
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d15**2. - 1. ))*( (dg5d15*dg1d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg5d15*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d15*dg5d15*dg1d15/(d15**2. - 1.) - dg1d15g5) ),
+
+            # gd5 a2,b2,g2
+            0.,0.,0.,
+
+            # gd5 a3,b3,g3
+            0.,0.,0.,
+
+            # gd5 a4,b4,g4
+            0.,0.,0.,
+
+            # gd5 a5
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d15**2. - 1. ))*( (dg5d15*da5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg5d15*sinh(2.*a5)*cosh(b5)*cosh(b5)/(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d15*dg5d15*da5d15/(d15**2. - 1.) - da5d15g5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d56**2. - 1. ))*( (dg5d56*da5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg5d56*sinh(2.*a5)*cosh(b5)*cosh(b5)/(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d56*dg5d56*da5d56/(d56**2. - 1.) - da5d56g5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d57**2. - 1. ))*( (dg5d57*da5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg5d57*sinh(2.*a5)*cosh(b5)*cosh(b5)/(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d57*dg5d57*da5d57/(d57**2. - 1.) - da5d57g5) ),
+
+            # gd5 b5
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d15**2. - 1. ))*( (dg5d15*db5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg5d15*sinh(2.*b5)*cosh(a5)*cosh(a5)/(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d15*dg5d15*db5d15/(d15**2. - 1.) - db5d15g5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d56**2. - 1. ))*( (dg5d56*db5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg5d56*sinh(2.*b5)*cosh(a5)*cosh(a5)/(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d56*dg5d56*db5d56/(d56**2. - 1.) - db5d56g5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d57**2. - 1. ))*( (dg5d57*db5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg5d57*sinh(2.*b5)*cosh(a5)*cosh(a5)/(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d57*dg5d57*db5d57/(d57**2. - 1.) - db5d57g5) ),
+
+            # gd5 g5
+            -spring_arr[2][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d15**2. - 1. ))*( (dg5d15*dg5d15)/sqrt( d15**2. - 1.) - ( arccosh(d15) - spring_arr[2][1] )*(dg5d15*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d15*dg5d15*dg5d15/(d15**2. - 1.) - dg5d15g5) ) + 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d56**2. - 1. ))*( (dg5d56*dg5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg5d56*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d56*dg5d56*dg5d56/(d56**2. - 1.) - dg5d56g5) ) +
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d57**2. - 1. ))*( (dg5d57*dg5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg5d57*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d57*dg5d57*dg5d57/(d57**2. - 1.) - dg5d57g5) ),
+
+            # gd5 a6,b6,g6
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d56**2. - 1. ))*( (dg5d56*da6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg5d56*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d56*dg5d56*da6d56/(d56**2. - 1.) - da6d56g5) ), 
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d56**2. - 1. ))*( (dg5d56*db6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg5d56*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d56*dg5d56*db6d56/(d56**2. - 1.) - db6d56g5) ),
+            -spring_arr[8][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d56**2. - 1. ))*( (dg5d56*dg6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg5d56*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d56*dg5d56*dg6d56/(d56**2. - 1.) - dg6d56g5) ),
+
+            # gd5 a7,b7,g7
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d57**2. - 1. ))*( (dg5d57*da7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg5d57*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d57*dg5d57*da7d57/(d57**2. - 1.) - da7d57g5) ), 
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d57**2. - 1. ))*( (dg5d57*db7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg5d57*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d57*dg5d57*db7d57/(d57**2. - 1.) - db7d57g5) ),
+            -spring_arr[9][0]/(mass_arr[4]*cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)*sqrt( d57**2. - 1. ))*( (dg5d57*dg7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg5d57*0./(cosh(a5)*cosh(a5)*cosh(b5)*cosh(b5)) + d57*dg5d57*dg7d57/(d57**2. - 1.) - dg7d57g5) ),
+
+            # gd5 a8,b8,g8
+            0.,0.,0.],
+
+            # ---------- #
+            #     V6     #
+            # ---------- #
+
+            # ad6 a1,b1,g1
+            [0.,0.,0.,
+
+            # ad6 a2,b2,g2
+            -spring_arr[4][0]/(mass_arr[5]*1.*sqrt( d26**2. - 1. ))*( (da6d26*da2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da6d26*0./1. + d26*da6d26*da2d26/(d26**2. - 1.) - da2d26a6) ), 
+            -spring_arr[4][0]/(mass_arr[5]*1.*sqrt( d26**2. - 1. ))*( (da6d26*db2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da6d26*0./1. + d26*da6d26*db2d26/(d26**2. - 1.) - db2d26a6) ),
+            -spring_arr[4][0]/(mass_arr[5]*1.*sqrt( d26**2. - 1. ))*( (da6d26*dg2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da6d26*0./1. + d26*da6d26*dg2d26/(d26**2. - 1.) - dg2d26a6) ),
+
+            # ad6 a3,b3,g3
+            0.,0.,0.,
+
+            # ad6 a4,b4,g4
+            0.,0.,0.,
+
+            # ad6 a5,b5,g5
+            -spring_arr[8][0]/(mass_arr[5]*1.*sqrt( d56**2. - 1. ))*( (da6d56*da5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(da6d56*0./1. + d56*da6d56*da5d56/(d56**2. - 1.) - da5d56a6) ), 
+            -spring_arr[8][0]/(mass_arr[5]*1.*sqrt( d56**2. - 1. ))*( (da6d56*db5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(da6d56*0./1. + d56*da6d56*db5d56/(d56**2. - 1.) - db5d56a6) ),
+            -spring_arr[8][0]/(mass_arr[5]*1.*sqrt( d56**2. - 1. ))*( (da6d56*dg5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(da6d56*0./1. + d56*da6d56*dg5d56/(d56**2. - 1.) - dg5d56a6) ),
+
+            # ad6 a6
+            -spring_arr[4][0]/(mass_arr[5]*1.*sqrt( d26**2. - 1. ))*( (da6d26*da6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da6d26*0./1. + d26*da6d26*da6d26/(d26**2. - 1.) - da6d26a6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*1.*sqrt( d56**2. - 1. ))*( (da6d56*da6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da6d56*0./1. + d56*da6d56*da6d56/(d56**2. - 1.) - da6d56a6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*1.*sqrt( d68**2. - 1. ))*( (da6d68*da6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da6d68*0./1. + d68*da6d68*da6d68/(d68**2. - 1.) - da6d68a6) ),
+
+            # ad6 b6
+            -spring_arr[4][0]/(mass_arr[5]*1.*sqrt( d26**2. - 1. ))*( (da6d26*db6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da6d26*0./1. + d26*da6d26*db6d26/(d26**2. - 1.) - db6d26a6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*1.*sqrt( d56**2. - 1. ))*( (da6d56*db6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da6d56*0./1. + d56*da6d56*db6d56/(d56**2. - 1.) - db6d56a6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*1.*sqrt( d68**2. - 1. ))*( (da6d68*db6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da6d68*0./1. + d68*da6d68*db6d68/(d68**2. - 1.) - db6d68a6) ),
+
+            # ad6 g6
+            -spring_arr[4][0]/(mass_arr[5]*1.*sqrt( d26**2. - 1. ))*( (da6d26*dg6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(da6d26*0./1. + d26*da6d26*dg6d26/(d26**2. - 1.) - dg6d26a6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*1.*sqrt( d56**2. - 1. ))*( (da6d56*dg6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(da6d56*0./1. + d56*da6d56*dg6d56/(d56**2. - 1.) - dg6d56a6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*1.*sqrt( d68**2. - 1. ))*( (da6d68*dg6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da6d68*0./1. + d68*da6d68*dg6d68/(d68**2. - 1.) - dg6d68a6) ),
+
+            # ad6 a6,b6,g6
+            0.,0.,0.,
+
+            # ad6 a7,b7,g7
+            0.,0.,0.
+
+            # ad6 a8,b8,g8
+            -spring_arr[10][0]/(mass_arr[5]*1.*sqrt( d68**2. - 1. ))*( (da6d68*da8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da6d68*0./1. + d68*da6d68*da8d68/(d68**2. - 1.) - da8d68a6) ), 
+            -spring_arr[10][0]/(mass_arr[5]*1.*sqrt( d68**2. - 1. ))*( (da6d68*db8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da6d68*0./1. + d68*da6d68*db8d68/(d68**2. - 1.) - db8d68a6) ),
+            -spring_arr[10][0]/(mass_arr[5]*1.*sqrt( d68**2. - 1. ))*( (da6d68*dg8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da6d68*0./1. + d68*da6d68*dg8d68/(d68**2. - 1.) - dg8d68a6) )],
+
+            # ---------- #
+
+            # bd6 a1,b1,g1
+            [0.,0.,0.,
+
+            # bd6 a2,b2,g2
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d26**2. - 1. ))*( (db6d26*da2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db6d26*0./(cosh(a6)*cosh(a6)) + d26*db6d26*da2d26/(d26**2. - 1.) - da2d26b6) ), 
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d26**2. - 1. ))*( (db6d26*db2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db6d26*0./(cosh(a6)*cosh(a6)) + d26*db6d26*db2d26/(d26**2. - 1.) - db2d26b6) ),
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d26**2. - 1. ))*( (db6d26*dg2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db6d26*0./(cosh(a6)*cosh(a6)) + d26*db6d26*dg2d26/(d26**2. - 1.) - dg2d26b6) ),
+
+            # bd6 a3,b3,g3
+            0.,0.,0.,
+
+            # bd6 a4,b4,g4
+            0.,0.,0.,
+
+            # bd6 a5,b5,g5
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d56**2. - 1. ))*( (db6d56*da5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(db6d56*0./(cosh(a6)*cosh(a6)) + d56*db6d56*da5d56/(d56**2. - 1.) - da5d56b6) ), 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d56**2. - 1. ))*( (db6d56*db5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(db6d56*0./(cosh(a6)*cosh(a6)) + d56*db6d56*db5d56/(d56**2. - 1.) - db5d56b6) ),
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d56**2. - 1. ))*( (db6d56*dg5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(db6d56*0./(cosh(a6)*cosh(a6)) + d56*db6d56*dg5d56/(d56**2. - 1.) - dg5d56b6) ),
+
+            # bd6 a6
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d26**2. - 1. ))*( (db6d26*da6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db6d26*sinh(2.*a6)/(cosh(a6)*cosh(a6)) + d26*db6d26*da6d26/(d26**2. - 1.) - da6d26b6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d56**2. - 1. ))*( (db6d56*da6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db6d56*sinh(2.*a6)/(cosh(a6)*cosh(a6)) + d56*db6d56*da6d56/(d56**2. - 1.) - da6d56b6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d68**2. - 1. ))*( (db6d68*da6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db6d68*sinh(2.*a6)/(cosh(a6)*cosh(a6)) + d68*db6d68*da6d68/(d68**2. - 1.) - da6d68b6) ),
+
+            # bd6 b6
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d26**2. - 1. ))*( (db6d26*db6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db6d26*0./(cosh(a6)*cosh(a6)) + d26*db6d26*db6d26/(d26**2. - 1.) - db6d26b6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d56**2. - 1. ))*( (db6d56*db6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db6d56*0./(cosh(a6)*cosh(a6)) + d56*db6d56*db6d56/(d56**2. - 1.) - db6d56b6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d68**2. - 1. ))*( (db6d68*db6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db6d68*0./(cosh(a6)*cosh(a6)) + d68*db6d68*db6d68/(d68**2. - 1.) - db6d68b6) ),
+
+            # bd6 g6
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d26**2. - 1. ))*( (db6d26*dg6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(db6d26*0./(cosh(a6)*cosh(a6)) + d26*db6d26*dg6d26/(d26**2. - 1.) - dg6d26b6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d56**2. - 1. ))*( (db6d56*dg6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(db6d56*0./(cosh(a6)*cosh(a6)) + d56*db6d56*dg6d56/(d56**2. - 1.) - dg6d56b6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d68**2. - 1. ))*( (db6d68*dg6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db6d68*0./(cosh(a6)*cosh(a6)) + d68*db6d68*dg6d68/(d68**2. - 1.) - dg6d68b6) ),
+
+            # bd6 a6,b6,g6
+            0.,0.,0.,
+
+            # bd6 a7,b7,g7
+            0.,0.,0.
+
+            # bd6 a8,b8,g8
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d68**2. - 1. ))*( (db6d68*da8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db6d68*0./(cosh(a6)*cosh(a6)) + d68*db6d68*da8d68/(d68**2. - 1.) - da8d68b6) ), 
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d68**2. - 1. ))*( (db6d68*db8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db6d68*0./(cosh(a6)*cosh(a6)) + d68*db6d68*db8d68/(d68**2. - 1.) - db8d68b6) ),
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*sqrt( d68**2. - 1. ))*( (db6d68*dg8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db6d68*0./(cosh(a6)*cosh(a6)) + d68*db6d68*dg8d68/(d68**2. - 1.) - dg8d68b6) )],
+
+            # ---------- #
+
+            # gd6 a1,b1,g1
+            [0.,0.,0.,
+
+            # gd6 a2,b2,g2
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d26**2. - 1. ))*( (dg6d26*da2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg6d26*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d26*dg6d26*da2d26/(d26**2. - 1.) - da2d26g6) ), 
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d26**2. - 1. ))*( (dg6d26*db2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg6d26*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d26*dg6d26*db2d26/(d26**2. - 1.) - db2d26g6) ),
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d26**2. - 1. ))*( (dg6d26*dg2d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg6d26*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d26*dg6d26*dg2d26/(d26**2. - 1.) - dg2d26g6) ),
+
+            # gd6 a3,b3,g3
+            0.,0.,0.,
+
+            # gd6 a4,b4,g4
+            0.,0.,0.,
+
+            # gd6 a5,b5,g5
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d56**2. - 1. ))*( (dg6d56*da5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(dg6d56*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d56*dg6d56*da5d56/(d56**2. - 1.) - da5d56g6) ), 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d56**2. - 1. ))*( (dg6d56*db5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(dg6d56*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d56*dg6d56*db5d56/(d56**2. - 1.) - db5d56g6) ),
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d56**2. - 1. ))*( (dg6d56*dg5d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[4][1] )*(dg6d56*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d56*dg6d56*dg5d56/(d56**2. - 1.) - dg5d56g6) ),
+
+            # gd6 a6
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d26**2. - 1. ))*( (dg6d26*da6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg6d26*sinh(2.*a6)*cosh(b6)*cosh(b6)/(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d26*dg6d26*da6d26/(d26**2. - 1.) - da6d26g6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d56**2. - 1. ))*( (dg6d56*da6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg6d56*sinh(2.*a6)*cosh(b6)*cosh(b6)/(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d56*dg6d56*da6d56/(d56**2. - 1.) - da6d56g6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d68**2. - 1. ))*( (dg6d68*da6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg6d68*sinh(2.*a6)*cosh(b6)*cosh(b6)/(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d68*dg6d68*da6d68/(d68**2. - 1.) - da6d68g6) ),
+
+            # gd6 b6
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d26**2. - 1. ))*( (dg6d26*db6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg6d26*sinh(2.*b6)*cosh(a6)*cosh(a6)/(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d26*dg6d26*db6d26/(d26**2. - 1.) - db6d26g6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d56**2. - 1. ))*( (dg6d56*db6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg6d56*sinh(2.*b6)*cosh(a6)*cosh(a6)/(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d56*dg6d56*db6d56/(d56**2. - 1.) - db6d56g6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d68**2. - 1. ))*( (dg6d68*db6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg6d68*sinh(2.*b6)*cosh(a6)*cosh(a6)/(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d68*dg6d68*db6d68/(d68**2. - 1.) - db6d68g6) ),
+
+            # gd6 g6
+            -spring_arr[4][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d26**2. - 1. ))*( (dg6d26*dg6d26)/sqrt( d26**2. - 1.) - ( arccosh(d26) - spring_arr[4][1] )*(dg6d26*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d26*dg6d26*dg6d26/(d26**2. - 1.) - dg6d26g6) ) + 
+            -spring_arr[8][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d56**2. - 1. ))*( (dg6d56*dg6d56)/sqrt( d56**2. - 1.) - ( arccosh(d56) - spring_arr[8][1] )*(dg6d56*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d56*dg6d56*dg6d56/(d56**2. - 1.) - dg6d56g6) ) +
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d68**2. - 1. ))*( (dg6d68*dg6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg6d68*0./(cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)) + d68*dg6d68*dg6d68/(d68**2. - 1.) - dg6d68g6) ),
+
+            # gd6 a6,b6,g6
+            0.,0.,0.,
+
+            # gd6 a7,b7,g7
+            0.,0.,0.
+
+            # gd6 a8,b8,g8
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d68**2. - 1. ))*( (dg6d68*da8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg6d68*0./(cosh(a6)*cosh(a6)) + d68*dg6d68*da8d68/(d68**2. - 1.) - da8d68g6) ), 
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d68**2. - 1. ))*( (dg6d68*db8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg6d68*0./(cosh(a6)*cosh(a6)) + d68*dg6d68*db8d68/(d68**2. - 1.) - db8d68g6) ),
+            -spring_arr[10][0]/(mass_arr[5]*cosh(a6)*cosh(a6)*cosh(b6)*cosh(b6)*sqrt( d68**2. - 1. ))*( (dg6d68*dg8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg6d68*0./(cosh(a6)*cosh(a6)) + d68*dg6d68*dg8d68/(d68**2. - 1.) - dg8d68g6) )],
+
+            # ---------- #
+            #     V7     #
+            # ---------- #
+
+            # ad7 a1,b1,g1
+            [0.,0.,0.,
+
+            # ad7 a2,b2,g2
+            0.,0.,0.,
+
+            # ad7 a3,b3,g3
+            -spring_arr[6][0]/(mass_arr[6]*1.*sqrt( d37**2. - 1. ))*( (da7d37*da3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da7d37*0./1. + d37*da7d37*da3d37/(d37**2. - 1.) - da3d37a7) ), 
+            -spring_arr[6][0]/(mass_arr[6]*1.*sqrt( d37**2. - 1. ))*( (da7d37*db3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da7d37*0./1. + d37*da7d37*db3d37/(d37**2. - 1.) - db3d37a7) ),
+            -spring_arr[6][0]/(mass_arr[6]*1.*sqrt( d37**2. - 1. ))*( (da7d37*dg3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da7d37*0./1. + d37*da7d37*dg3d37/(d37**2. - 1.) - dg3d37a7) ),
+
+            # ad7 a4,b4,g4
+            0.,0.,0.,
+
+            # ad7 a5,b5,g5
+            -spring_arr[9][0]/(mass_arr[6]*1.*sqrt( d57**2. - 1. ))*( (da7d57*da5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da7d57*0./1. + d57*da7d57*da5d57/(d57**2. - 1.) - da5d57a7) ), 
+            -spring_arr[9][0]/(mass_arr[6]*1.*sqrt( d57**2. - 1. ))*( (da7d57*db5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da7d57*0./1. + d57*da7d57*db5d57/(d57**2. - 1.) - db5d57a7) ),
+            -spring_arr[9][0]/(mass_arr[6]*1.*sqrt( d57**2. - 1. ))*( (da7d57*dg5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da7d57*0./1. + d57*da7d57*dg5d57/(d57**2. - 1.) - dg5d57a7) ),
+
+            # ad7 a6,b6,g6
+            0.,0.,0.,
+
+            # ad7 a7
+            -spring_arr[6][0]/(mass_arr[6]*1.*sqrt( d37**2. - 1. ))*( (da7d37*da7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da7d37*0./1. + d37*da7d37*da7d37/(d37**2. - 1.) - da7d37a7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*1.*sqrt( d57**2. - 1. ))*( (da7d57*da7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da7d57*0./1. + d57*da7d57*da7d57/(d57**2. - 1.) - da7d57a7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*1.*sqrt( d78**2. - 1. ))*( (da7d78*da7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da7d78*0./1. + d78*da7d78*da7d78/(d78**2. - 1.) - da7d78a7) ),
+
+            # ad7 b7
+            -spring_arr[6][0]/(mass_arr[6]*1.*sqrt( d37**2. - 1. ))*( (da7d37*db7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da7d37*0./1. + d37*da7d37*db7d37/(d37**2. - 1.) - db7d37a7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*1.*sqrt( d57**2. - 1. ))*( (da7d57*db7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da7d57*0./1. + d57*da7d57*db7d57/(d57**2. - 1.) - db7d57a7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*1.*sqrt( d78**2. - 1. ))*( (da7d78*db7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da7d78*0./1. + d78*da7d78*db7d78/(d78**2. - 1.) - db7d78a7) ),
+
+            # ad7 g7
+            -spring_arr[6][0]/(mass_arr[6]*1.*sqrt( d37**2. - 1. ))*( (da7d37*dg7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(da7d37*0./1. + d37*da7d37*dg7d37/(d37**2. - 1.) - dg7d37a7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*1.*sqrt( d57**2. - 1. ))*( (da7d57*dg7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(da7d57*0./1. + d57*da7d57*dg7d57/(d57**2. - 1.) - dg7d57a7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*1.*sqrt( d78**2. - 1. ))*( (da7d78*dg7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da7d78*0./1. + d78*da7d78*dg7d78/(d78**2. - 1.) - dg7d78a7) ),
+
+            # ad7 a8,b8,g8
+            -spring_arr[11][0]/(mass_arr[6]*1.*sqrt( d78**2. - 1. ))*( (da7d78*da8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da7d78*0./1. + d78*da7d78*da8d78/(d78**2. - 1.) - da8d78a7) ), 
+            -spring_arr[11][0]/(mass_arr[6]*1.*sqrt( d78**2. - 1. ))*( (da7d78*db8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da7d78*0./1. + d78*da7d78*db8d78/(d78**2. - 1.) - db8d78a7) ),
+            -spring_arr[11][0]/(mass_arr[6]*1.*sqrt( d78**2. - 1. ))*( (da7d78*dg8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da7d78*0./1. + d78*da7d78*dg8d78/(d78**2. - 1.) - dg8d78a7) )],
+
+            # ---------- #
+
+            # bd7 a1,b1,g1
+            [0.,0.,0.,
+
+            # bd7 a2,b2,g2
+            0.,0.,0.,
+
+            # bd7 a3,b3,g3
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d37**2. - 1. ))*( (db7d37*da3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db7d37*0./(cosh(a7)*cosh(a7)) + d37*db7d37*da3d37/(d37**2. - 1.) - da3d37b7) ), 
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d37**2. - 1. ))*( (db7d37*db3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db7d37*0./(cosh(a7)*cosh(a7)) + d37*db7d37*db3d37/(d37**2. - 1.) - db3d37b7) ),
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d37**2. - 1. ))*( (db7d37*dg3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db7d37*0./(cosh(a7)*cosh(a7)) + d37*db7d37*dg3d37/(d37**2. - 1.) - dg3d37b7) ),
+
+            # bd7 a4,b4,g4
+            0.,0.,0.,
+
+            # bd7 a5,b5,g5
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d57**2. - 1. ))*( (db7d57*da5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db7d57*0./(cosh(a7)*cosh(a7)) + d57*db7d57*da5d57/(d57**2. - 1.) - da5d57b7) ), 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d57**2. - 1. ))*( (db7d57*db5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db7d57*0./(cosh(a7)*cosh(a7)) + d57*db7d57*db5d57/(d57**2. - 1.) - db5d57b7) ),
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d57**2. - 1. ))*( (db7d57*dg5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db7d57*0./(cosh(a7)*cosh(a7)) + d57*db7d57*dg5d57/(d57**2. - 1.) - dg5d57b7) ),
+
+            # bd7 a6,b6,g6
+            0.,0.,0.,
+
+            # bd7 a7
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d37**2. - 1. ))*( (db7d37*da7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db7d37*sinh(2.*a7)/(cosh(a7)*cosh(a7)) + d37*db7d37*da7d37/(d37**2. - 1.) - da7d37b7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d57**2. - 1. ))*( (db7d57*da7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db7d57*sinh(2.*a7)/(cosh(a7)*cosh(a7)) + d57*db7d57*da7d57/(d57**2. - 1.) - da7d57b7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d78**2. - 1. ))*( (db7d78*da7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db7d78*sinh(2.*a7)/(cosh(a7)*cosh(a7)) + d78*db7d78*da7d78/(d78**2. - 1.) - da7d78b7) ),
+
+            # bd7 b7
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d37**2. - 1. ))*( (db7d37*db7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db7d37*0./(cosh(a7)*cosh(a7)) + d37*db7d37*db7d37/(d37**2. - 1.) - db7d37b7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d57**2. - 1. ))*( (db7d57*db7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db7d57*0./(cosh(a7)*cosh(a7)) + d57*db7d57*db7d57/(d57**2. - 1.) - db7d57b7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d78**2. - 1. ))*( (db7d78*db7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db7d78*0./(cosh(a7)*cosh(a7)) + d78*db7d78*db7d78/(d78**2. - 1.) - db7d78b7) ),
+
+            # bd7 g7
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d37**2. - 1. ))*( (db7d37*dg7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(db7d37*0./(cosh(a7)*cosh(a7)) + d37*db7d37*dg7d37/(d37**2. - 1.) - dg7d37b7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d57**2. - 1. ))*( (db7d57*dg7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(db7d57*0./(cosh(a7)*cosh(a7)) + d57*db7d57*dg7d57/(d57**2. - 1.) - dg7d57b7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d78**2. - 1. ))*( (db7d78*dg7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db7d78*0./(cosh(a7)*cosh(a7)) + d78*db7d78*dg7d78/(d78**2. - 1.) - dg7d78b7) ),
+
+            # bd7 a8,b8,g8
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d78**2. - 1. ))*( (db7d78*da8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db7d78*0./(cosh(a7)*cosh(a7)) + d78*db7d78*da8d78/(d78**2. - 1.) - da8d78b7) ), 
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d78**2. - 1. ))*( (db7d78*db8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db7d78*0./(cosh(a7)*cosh(a7)) + d78*db7d78*db8d78/(d78**2. - 1.) - db8d78b7) ),
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*sqrt( d78**2. - 1. ))*( (db7d78*dg8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db7d78*0./(cosh(a7)*cosh(a7)) + d78*db7d78*dg8d78/(d78**2. - 1.) - dg8d78b7) )],
+
+            # ---------- #
+
+            # gd7 a1,b1,g1
+            [0.,0.,0.,
+
+            # gd7 a2,b2,g2
+            0.,0.,0.,
+
+            # gd7 a3,b3,g3
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d37**2. - 1. ))*( (dg7d37*da3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg7d37*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d37*dg7d37*da3d37/(d37**2. - 1.) - da3d37g7) ), 
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d37**2. - 1. ))*( (dg7d37*db3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg7d37*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d37*dg7d37*db3d37/(d37**2. - 1.) - db3d37g7) ),
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d37**2. - 1. ))*( (dg7d37*dg3d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg7d37*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d37*dg7d37*dg3d37/(d37**2. - 1.) - dg3d37g7) ),
+
+            # gd7 a4,b4,g4
+            0.,0.,0.,
+
+            # gd7 a5,b5,g5
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d57**2. - 1. ))*( (dg7d57*da5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg7d57*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d57*dg7d57*da5d57/(d57**2. - 1.) - da5d57g7) ), 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d57**2. - 1. ))*( (dg7d57*db5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg7d57*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d57*dg7d57*db5d57/(d57**2. - 1.) - db5d57g7) ),
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d57**2. - 1. ))*( (dg7d57*dg5d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg7d57*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d57*dg7d57*dg5d57/(d57**2. - 1.) - dg5d57g7) ),
+
+            # gd7 a6,b6,g6
+            0.,0.,0.,
+
+            # gd7 a7
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d37**2. - 1. ))*( (dg7d37*da7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg7d37*sinh(2.*a7)*cosh(b7)*cosh(b7)/(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d37*dg7d37*da7d37/(d37**2. - 1.) - da7d37g7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d57**2. - 1. ))*( (dg7d57*da7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg7d57*sinh(2.*a7)*cosh(b7)*cosh(b7)/(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d57*dg7d57*da7d57/(d57**2. - 1.) - da7d57g7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d78**2. - 1. ))*( (dg7d78*da7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg7d78*sinh(2.*a7)*cosh(b7)*cosh(b7)/(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d78*dg7d78*da7d78/(d78**2. - 1.) - da7d78g7) ),
+
+            # gd7 b7
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d37**2. - 1. ))*( (dg7d37*db7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg7d37*sinh(2.*b7)*cosh(a7)*cosh(a7)/(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d37*dg7d37*db7d37/(d37**2. - 1.) - db7d37g7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d57**2. - 1. ))*( (dg7d57*db7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg7d57*sinh(2.*b7)*cosh(a7)*cosh(a7)/(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d57*dg7d57*db7d57/(d57**2. - 1.) - db7d57g7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d78**2. - 1. ))*( (dg7d78*db7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg7d78*sinh(2.*b7)*cosh(a7)*cosh(a7)/(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d78*dg7d78*db7d78/(d78**2. - 1.) - db7d78g7) ),
+
+            # gd7 g7
+            -spring_arr[6][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d37**2. - 1. ))*( (dg7d37*dg7d37)/sqrt( d37**2. - 1.) - ( arccosh(d37) - spring_arr[6][1] )*(dg7d37*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d37*dg7d37*dg7d37/(d37**2. - 1.) - dg7d37g7) ) + 
+            -spring_arr[9][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d57**2. - 1. ))*( (dg7d57*dg7d57)/sqrt( d57**2. - 1.) - ( arccosh(d57) - spring_arr[9][1] )*(dg7d57*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d57*dg7d57*dg7d57/(d57**2. - 1.) - dg7d57g7) ) +
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d78**2. - 1. ))*( (dg7d78*dg7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg7d78*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d78*dg7d78*dg7d78/(d78**2. - 1.) - dg7d78g7) ),
+
+            # gd7 a8,b8,g8
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d78**2. - 1. ))*( (dg7d78*da8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg7d78*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d78*dg7d78*da8d78/(d78**2. - 1.) - da8d78g7) ), 
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d78**2. - 1. ))*( (dg7d78*db8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg7d78*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d78*dg7d78*db8d78/(d78**2. - 1.) - db8d78g7) ),
+            -spring_arr[11][0]/(mass_arr[6]*cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)*sqrt( d78**2. - 1. ))*( (dg7d78*dg8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg7d78*0./(cosh(a7)*cosh(a7)*cosh(b7)*cosh(b7)) + d78*dg7d78*dg8d78/(d78**2. - 1.) - dg8d78g7) )],
+
+            # ---------- #
+            #     V8     #
+            # ---------- #
+
+            # ad8 a1,b1,g1
+            [0.,0.,0.,
+
+            # ad8 a2,b2,g2
+            0.,0.,0.,
+
+            # ad8 a3,b3,g3
+            0.,0.,0.,
+
+            # ad8 a4,b4,g4
+            -spring_arr[7][0]/(mass_arr[7]*1.*sqrt( d48**2. - 1. ))*( (da8d48*da4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da8d48*0./1. + d48*da8d48*da4d48/(d48**2. - 1.) - da4d48a8) ), 
+            -spring_arr[7][0]/(mass_arr[7]*1.*sqrt( d48**2. - 1. ))*( (da8d48*db4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da8d48*0./1. + d48*da8d48*db4d48/(d48**2. - 1.) - db4d48a8) ),
+            -spring_arr[7][0]/(mass_arr[7]*1.*sqrt( d48**2. - 1. ))*( (da8d48*dg4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da8d48*0./1. + d48*da8d48*dg4d48/(d48**2. - 1.) - dg4d48a8) ),
+
+            # ad8 a5,b5,g5
+            0.,0.,0.,
+
+            # ad8 a6,b6,g6
+            -spring_arr[10][0]/(mass_arr[7]*1.*sqrt( d68**2. - 1. ))*( (da8d68*da6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da8d68*0./1. + d68*da8d68*da6d68/(d68**2. - 1.) - da6d68a8) ), 
+            -spring_arr[10][0]/(mass_arr[7]*1.*sqrt( d68**2. - 1. ))*( (da8d68*db6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da8d68*0./1. + d68*da8d68*db6d68/(d68**2. - 1.) - db6d68a8) ),
+            -spring_arr[10][0]/(mass_arr[7]*1.*sqrt( d68**2. - 1. ))*( (da8d68*dg6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da8d68*0./1. + d68*da8d68*dg6d68/(d68**2. - 1.) - dg6d68a8) ),
+
+            # ad8 a7,b7,g7
+            -spring_arr[11][0]/(mass_arr[7]*1.*sqrt( d78**2. - 1. ))*( (da8d78*da7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da8d78*0./1. + d78*da8d78*da7d78/(d78**2. - 1.) - da7d78a8) ), 
+            -spring_arr[11][0]/(mass_arr[7]*1.*sqrt( d78**2. - 1. ))*( (da8d78*db7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da8d78*0./1. + d78*da8d78*db7d78/(d78**2. - 1.) - db7d78a8) ),
+            -spring_arr[11][0]/(mass_arr[7]*1.*sqrt( d78**2. - 1. ))*( (da8d78*dg7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da8d78*0./1. + d78*da8d78*dg7d78/(d78**2. - 1.) - dg7d78a8) )
+
+            # ad8 a8
+            -spring_arr[7][0]/(mass_arr[7]*1.*sqrt( d48**2. - 1. ))*( (da8d48*da8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da8d48*0./1. + d48*da8d48*da8d48/(d48**2. - 1.) - da8d48a8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*1.*sqrt( d68**2. - 1. ))*( (da8d68*da8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da8d68*0./1. + d68*da8d68*da8d68/(d68**2. - 1.) - da8d68a8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*1.*sqrt( d78**2. - 1. ))*( (da8d78*da8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da8d78*0./1. + d78*da8d78*da8d78/(d78**2. - 1.) - da8d78a8) ),
+
+            # ad8 b8
+            -spring_arr[7][0]/(mass_arr[7]*1.*sqrt( d48**2. - 1. ))*( (da8d48*db8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da8d48*0./1. + d48*da8d48*db8d48/(d48**2. - 1.) - db8d48a8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*1.*sqrt( d68**2. - 1. ))*( (da8d68*db8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da8d68*0./1. + d68*da8d68*db8d68/(d68**2. - 1.) - db8d68a8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*1.*sqrt( d78**2. - 1. ))*( (da8d78*db8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da8d78*0./1. + d78*da8d78*db8d78/(d78**2. - 1.) - db8d78a8) ),
+
+            # ad8 g8
+            -spring_arr[7][0]/(mass_arr[7]*1.*sqrt( d48**2. - 1. ))*( (da8d48*dg8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(da8d48*0./1. + d48*da8d48*dg8d48/(d48**2. - 1.) - dg8d48a8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*1.*sqrt( d68**2. - 1. ))*( (da8d68*dg8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(da8d68*0./1. + d68*da8d68*dg8d68/(d68**2. - 1.) - dg8d68a8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*1.*sqrt( d78**2. - 1. ))*( (da8d78*dg8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(da8d78*0./1. + d78*da8d78*dg8d78/(d78**2. - 1.) - dg8d78a8) )],
+
+            # ---------- #
+
+            # bd8 a1,b1,g1
+            [0.,0.,0.,
+
+            # bd8 a2,b2,g2
+            0.,0.,0.,
+
+            # bd8 a3,b3,g3
+            0.,0.,0.,
+
+            # bd8 a4,b4,g4
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d48**2. - 1. ))*( (db8d48*da4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db8d48*0./(cosh(a8)*cosh(a8)) + d48*db8d48*da4d48/(d48**2. - 1.) - da4d48b8) ), 
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d48**2. - 1. ))*( (db8d48*db4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db8d48*0./(cosh(a8)*cosh(a8)) + d48*db8d48*db4d48/(d48**2. - 1.) - db4d48b8) ),
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d48**2. - 1. ))*( (db8d48*dg4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db8d48*0./(cosh(a8)*cosh(a8)) + d48*db8d48*dg4d48/(d48**2. - 1.) - dg4d48b8) ),
+
+            # bd8 a5,b5,g5
+            0.,0.,0.,
+
+            # bd8 a6,b6,g6
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d68**2. - 1. ))*( (db8d68*da6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db8d68*0./(cosh(a8)*cosh(a8)) + d68*db8d68*da6d68/(d68**2. - 1.) - da6d68b8) ), 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d68**2. - 1. ))*( (db8d68*db6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db8d68*0./(cosh(a8)*cosh(a8)) + d68*db8d68*db6d68/(d68**2. - 1.) - db6d68b8) ),
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d68**2. - 1. ))*( (db8d68*dg6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db8d68*0./(cosh(a8)*cosh(a8)) + d68*db8d68*dg6d68/(d68**2. - 1.) - dg6d68b8) ),
+
+            # bd8 a7,b7,g7
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d78**2. - 1. ))*( (db8d78*da7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db8d78*0./(cosh(a8)*cosh(a8)) + d78*db8d78*da7d78/(d78**2. - 1.) - da7d78b8) ), 
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d78**2. - 1. ))*( (db8d78*db7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db8d78*0./(cosh(a8)*cosh(a8)) + d78*db8d78*db7d78/(d78**2. - 1.) - db7d78b8) ),
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d78**2. - 1. ))*( (db8d78*dg7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db8d78*0./(cosh(a8)*cosh(a8)) + d78*db8d78*dg7d78/(d78**2. - 1.) - dg7d78b8) )
+
+            # bd8 a8
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d48**2. - 1. ))*( (db8d48*da8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db8d48*sinh(2.*a8)/(cosh(a8)*cosh(a8)) + d48*db8d48*da8d48/(d48**2. - 1.) - da8d48b8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d68**2. - 1. ))*( (db8d68*da8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db8d68*sinh(2.*a8)/(cosh(a8)*cosh(a8)) + d68*db8d68*da8d68/(d68**2. - 1.) - da8d68b8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d78**2. - 1. ))*( (db8d78*da8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db8d78*sinh(2.*a8)/(cosh(a8)*cosh(a8)) + d78*db8d78*da8d78/(d78**2. - 1.) - da8d78b8) ),
+
+            # bd8 b8
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d48**2. - 1. ))*( (db8d48*db8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db8d48*0./(cosh(a8)*cosh(a8)) + d48*db8d48*db8d48/(d48**2. - 1.) - db8d48b8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d68**2. - 1. ))*( (db8d68*db8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db8d68*0./(cosh(a8)*cosh(a8)) + d68*db8d68*db8d68/(d68**2. - 1.) - db8d68b8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d78**2. - 1. ))*( (db8d78*db8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db8d78*0./(cosh(a8)*cosh(a8)) + d78*db8d78*db8d78/(d78**2. - 1.) - db8d78b8) ),
+
+            # bd8 g8
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d48**2. - 1. ))*( (db8d48*dg8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(db8d48*0./(cosh(a8)*cosh(a8)) + d48*db8d48*dg8d48/(d48**2. - 1.) - dg8d48b8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d68**2. - 1. ))*( (db8d68*dg8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(db8d68*0./(cosh(a8)*cosh(a8)) + d68*db8d68*dg8d68/(d68**2. - 1.) - dg8d68b8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*sqrt( d78**2. - 1. ))*( (db8d78*dg8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(db8d78*0./(cosh(a8)*cosh(a8)) + d78*db8d78*dg8d78/(d78**2. - 1.) - dg8d78b8) )],
+
+            # ---------- #
+
+            # gd8 a1,b1,g1
+            [0.,0.,0.,
+
+            # gd8 a2,b2,g2
+            0.,0.,0.,
+
+            # gd8 a3,b3,g3
+            0.,0.,0.,
+
+            # gd8 a4,b4,g4
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d48**2. - 1. ))*( (dg8d48*da4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg8d48*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d48*dg8d48*da4d48/(d48**2. - 1.) - da4d48g8) ), 
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d48**2. - 1. ))*( (dg8d48*db4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg8d48*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d48*dg8d48*db4d48/(d48**2. - 1.) - db4d48g8) ),
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d48**2. - 1. ))*( (dg8d48*dg4d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg8d48*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d48*dg8d48*dg4d48/(d48**2. - 1.) - dg4d48g8) ),
+
+            # gd8 a5,b5,g5
+            0.,0.,0.,
+
+            # gd8 a6,b6,g6
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d68**2. - 1. ))*( (dg8d68*da6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg8d68*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d68*dg8d68*da6d68/(d68**2. - 1.) - da6d68g8) ), 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d68**2. - 1. ))*( (dg8d68*db6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg8d68*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d68*dg8d68*db6d68/(d68**2. - 1.) - db6d68g8) ),
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d68**2. - 1. ))*( (dg8d68*dg6d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg8d68*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d68*dg8d68*dg6d68/(d68**2. - 1.) - dg6d68g8) ),
+
+            # gd8 a7,b7,g7
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d78**2. - 1. ))*( (dg8d78*da7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg8d78*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d78*dg8d78*da7d78/(d78**2. - 1.) - da7d78g8) ), 
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d78**2. - 1. ))*( (dg8d78*db7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg8d78*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d78*dg8d78*db7d78/(d78**2. - 1.) - db7d78g8) ),
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d78**2. - 1. ))*( (dg8d78*dg7d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg8d78*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d78*dg8d78*dg7d78/(d78**2. - 1.) - dg7d78g8) )
+
+            # gd8 a8
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d48**2. - 1. ))*( (dg8d48*da8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg8d48*sinh(2.*a8)*cosh(b8)*cosh(b8)/(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d48*dg8d48*da8d48/(d48**2. - 1.) - da8d48g8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d68**2. - 1. ))*( (dg8d68*da8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg8d68*sinh(2.*a8)*cosh(b8)*cosh(b8)/(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d68*dg8d68*da8d68/(d68**2. - 1.) - da8d68g8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d78**2. - 1. ))*( (dg8d78*da8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg8d78*sinh(2.*a8)*cosh(b8)*cosh(b8)/(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d78*dg8d78*da8d78/(d78**2. - 1.) - da8d78g8) ),
+
+            # gd8 b8
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d48**2. - 1. ))*( (dg8d48*db8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg8d48*sinh(2.*b8)*cosh(a8)*cosh(a8)/(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d48*dg8d48*db8d48/(d48**2. - 1.) - db8d48g8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d68**2. - 1. ))*( (dg8d68*db8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg8d68*sinh(2.*b8)*cosh(a8)*cosh(a8)/(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d68*dg8d68*db8d68/(d68**2. - 1.) - db8d68g8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d78**2. - 1. ))*( (dg8d78*db8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg8d78*sinh(2.*b8)*cosh(a8)*cosh(a8)/(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d78*dg8d78*db8d78/(d78**2. - 1.) - db8d78g8) ),
+
+            # gd8 g8
+            -spring_arr[7][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d48**2. - 1. ))*( (dg8d48*dg8d48)/sqrt( d48**2. - 1.) - ( arccosh(d48) - spring_arr[7][1] )*(dg8d48*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d48*dg8d48*dg8d48/(d48**2. - 1.) - dg8d48g8) ) + 
+            -spring_arr[10][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d68**2. - 1. ))*( (dg8d68*dg8d68)/sqrt( d68**2. - 1.) - ( arccosh(d68) - spring_arr[10][1] )*(dg8d68*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d68*dg8d68*dg8d68/(d68**2. - 1.) - dg8d68g8) ) +
+            -spring_arr[11][0]/(mass_arr[7]*cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)*sqrt( d78**2. - 1. ))*( (dg8d78*dg8d78)/sqrt( d78**2. - 1.) - ( arccosh(d78) - spring_arr[11][1] )*(dg8d78*0./(cosh(a8)*cosh(a8)*cosh(b8)*cosh(b8)) + d78*dg8d78*dg8d78/(d78**2. - 1.) - dg8d78g8) )]
+
+        ])
+   
+    def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return an1 - an - .5*h*(adn + adn1)
+
+    def con2(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return bn1 - bn - .5*h*(bdn + bdn1)
+
+    def con3(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h): 
+        return gn1 - gn - .5*h*(gdn + gdn1)        
+
+    def con4(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, h, k, xo):
+        return (ad1n1 - ad1n - .5*h*(
+            (bd1n*bd1n + gd1n*gd1n*cosh(b1n)**2.)*sinh(a1n)*cosh(a1n) - k/m1*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (-cosh(a1n)*sinh(a2n) - sinh(a1n)*sinh(b1n)*cosh(a2n)*sinh(b2n) + sinh(a1n)*cosh(b1n)*cosh(a2n)*cosh(b2n)*cosh(g1n - g2n))/sqrt(-1. + 
+            (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))**2.)
+            + 
+            (bd1n1*bd1n1 + gd1n1*gd1n1*cosh(b1n1)**2.)*sinh(a1n1)*cosh(a1n1) - k/m1*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (-cosh(a1n1)*sinh(a2n1) - sinh(a1n1)*sinh(b1n1)*cosh(a2n1)*sinh(b2n1) + sinh(a1n1)*cosh(b1n1)*cosh(a2n1)*cosh(b2n1)*cosh(g1n1 - g2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.) 
+            ))
+
+    def con5(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, h, k, xo):
+        return (bd1n1 - bd1n - .5*h*(
+            gd1n*gd1n*sinh(b1n)*cosh(b1n) - 2.*ad1n*bd1n*tanh(a1n) - k/(m1*cosh(a1n)*cosh(a1n))*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (-cosh(a1n)*cosh(b1n)*cosh(a2n)*sinh(b2n) + cosh(a1n)*sinh(b1n)*cosh(a2n)*cosh(b2n)*cosh(g1n - g2n))/sqrt(-1. + 
+            (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))**2.)
+            + 
+            gd1n1*gd1n1*sinh(b1n1)*cosh(b1n1) - 2.*ad1n1*bd1n1*tanh(a1n1) - k/(m1*cosh(a1n1)*cosh(a1n1))*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (-cosh(a1n1)*cosh(b1n1)*cosh(a2n1)*sinh(b2n1) + cosh(a1n1)*sinh(b1n1)*cosh(a2n1)*cosh(b2n1)*cosh(g1n1 - g2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.)  
+            ))
+
+    def con6(a1n, a1n1, b1n, b1n1, g1n, g1n1, a2n, a2n1, b2n, b2n1, g2n, g2n1, ad1n, ad1n1, bd1n, bd1n1, gd1n, gd1n1, ad2n, ad2n1, bd2n, bd2n1, gd2n, gd2n1, m1, h, k, xo):
+        return (gd1n1 - gd1n - .5*h*(
+            -2.*ad1n*gd1n*tanh(a1n) - 2.*bd1n*gd1n*tanh(b1n) - k/(m1*cosh(a1n)*cosh(a1n)*cosh(b1n)*cosh(b1n))*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (cosh(a1n)*cosh(b1n)*cosh(a2n)*cosh(b2n)*sinh(g1n - g2n))/sqrt(-1. + 
+            (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n)*cosh(g1n - g2n) - sinh(b1n)*sinh(b2n)))**2.)
+            + 
+            -2.*ad1n1*gd1n1*tanh(a1n1) - 2.*bd1n1*gd1n1*tanh(b1n1) - k/(m1*cosh(a1n1)*cosh(a1n1)*cosh(b1n1)*cosh(b1n1))*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (cosh(a1n1)*cosh(b1n1)*cosh(a2n1)*cosh(b2n1)*sinh(g1n1 - g2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1)*cosh(g1n1 - g2n1) - sinh(b1n1)*sinh(b2n1)))**2.)
+            )) 
+    
+    def jacobian(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, ad1n1, bd1n1, gd1n1, ad2n1, bd2n1, gd2n1, m1, m2, h, k, xo):
+        spring_terms=jacobi_sp_terms(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, m2, k, xo)
+        return array([
+            [1.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0.],
+            [0.,1.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0.],
+            [0.,0.,1., 0.,0.,0., 0.,0.,-.5*h, 0.,0.,0.],
+
+            [0.,0.,0., 1.,0.,0., 0.,0.,0., -.5*h,0.,0.],
+            [0.,0.,0., 0.,1.,0., 0.,0.,0., 0.,-.5*h,0.],
+            [0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,-.5*h],
+
+            # ad1 update
+            [-.5*h*(bd1n1*bd1n1+cosh(b1n1)*cosh(b1n1)*gd1n1*gd1n1)*cosh(2.*a1n1) + spring_terms[0,0],
+            -.25*h*sinh(2.*a1n1)*sinh(2.*b1n1)*gd1n1*gd1n1 + spring_terms[0,1],
+            0. + spring_terms[0,2], 
+            
+            spring_terms[0,3],
+            spring_terms[0,4],
+            spring_terms[0,5],
+            
+            1.,
+            -.5*h*sinh(2.*a1n1)*bd1n1,
+            -.5*h*sinh(2.*a1n1)*cosh(b1n1)*cosh(b1n1)*gd1n1,
+
+            0.,
+            0.,
+            0.],
+
+            # bd1 update
+            [h*ad1n1*bd1n1/(cosh(a1n1)*cosh(a1n1)) + spring_terms[1,0],
+            -.5*h*cosh(2.*b1n1)*gd1n1*gd1n1 + spring_terms[1,1],
+            0. + spring_terms[1,2], 
+            
+            spring_terms[1,3],
+            spring_terms[1,4],
+            spring_terms[1,5],
+            
+            h*tanh(a1n1)*bd1n1,
+            1.+h*tanh(a1n1)*ad1n1,
+            -.5*h*sinh(2.*b1n1)*gd1n1,
+
+            0.,
+            0.,
+            0.],
+
+            # gd1 update
+            [h*ad1n1*gd1n1/(cosh(a1n1)*cosh(a1n1)) + spring_terms[2,0],
+            h*bd1n1*gd1n1/(cosh(b1n1)*cosh(b1n1)) + spring_terms[2,1],
+            0. + spring_terms[2,2],
+             
+            spring_terms[2,3],
+            spring_terms[2,4],
+            spring_terms[2,5],
+
+            h*tanh(a1n1)*gd1n1,
+            h*tanh(b1n1)*gd1n1,
+            1.+h*tanh(a1n1)*ad1n1+h*tanh(b1n1)*bd1n1,
+
+            0.,
+            0.,
+            0.],
+
+            # ad2 update
+            [spring_terms[3,0],
+            spring_terms[3,1],
+            spring_terms[3,2],
+
+            -.5*h*(bd2n1*bd2n1+cosh(b2n1)*cosh(b2n1)*gd2n1*gd2n1)*cosh(2.*a2n1) + spring_terms[3,3],
+            -.25*h*sinh(2.*a2n1)*sinh(2.*b2n1)*gd2n1*gd2n1 + spring_terms[3,4],
+            0. + spring_terms[3,5],
+
+            0.,
+            0.,
+            0.,
+
+            1.,
+            -.5*h*sinh(2.*a2n1)*bd2n1,
+            -.5*h*sinh(2.*a2n1)*cosh(b2n1)*cosh(b2n1)*gd2n1],
+
+            # bd2 update
+            [spring_terms[4,0],
+            spring_terms[4,1],
+            spring_terms[4,2],
+
+            h*ad2n1*bd2n1/(cosh(a2n1)*cosh(a2n1)) + spring_terms[4,3],
+            -.5*h*cosh(2.*b2n1)*gd2n1*gd2n1 + spring_terms[4,4],
+            0. + spring_terms[4,5],
+
+            0.,
+            0.,
+            0.,
+
+            h*tanh(a2n1)*bd2n1,
+            1.+h*tanh(a2n1)*ad2n1,
+            -.5*h*sinh(2.*b2n1)*gd2n1],
+
+            # gd2 update
+            [spring_terms[5,0],
+            spring_terms[5,1],
+            spring_terms[5,2],
+
+            h*ad2n1*gd2n1/(cosh(a2n1)*cosh(a2n1)) + spring_terms[5,3],
+            h*bd2n1*gd2n1/(cosh(b2n1)*cosh(b2n1)) + spring_terms[5,4],
+            0. + spring_terms[5,5],
+
+            0.,
+            0.,
+            0.,
+
+            h*tanh(a2n1)*gd2n1,
+            h*tanh(b2n1)*gd2n1,
+            1.+h*tanh(a2n1)*ad2n1+h*tanh(b2n1)*bd2n1]
+        ])
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    diff1=linalg.solve(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist),-array([
+        con1(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], step),
+        con2(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], step),
+        con3(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], step),
+        con1(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], step),
+        con2(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], step),
+        con3(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], step),
+
+        con4(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], m1, step, sprcon, eqdist),
+        con5(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], m1, step, sprcon, eqdist),
+        con6(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], m1, step, sprcon, eqdist),
+        con4(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], m2, step, sprcon, eqdist),
+        con5(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], m2, step, sprcon, eqdist),
+        con6(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos2n[2], pos2n[2], pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos1n[2], pos1n[2], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel2n[2], vel2n[2], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel1n[2], vel1n[2], m2, step, sprcon, eqdist),       
+    ]))
+    val1 = array([pos1n[0]+diff1[0], pos1n[1]+diff1[1], pos1n[2]+diff1[2], pos2n[0]+diff1[3], pos2n[1]+diff1[4], pos2n[2]+diff1[5], vel1n[0]+diff1[6], vel1n[1]+diff1[7], vel1n[2]+diff1[8], vel2n[0]+diff1[9], vel2n[1]+diff1[10], vel2n[2]+diff1[11]])    
+    x = 0
+    while(x < 7):
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], val1[4], val1[5], val1[6], val1[7], val1[8], val1[9], val1[10], val1[11], m1, m2, step, sprcon, eqdist),-array([
+            con1(pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], step),
+            con2(pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], step),
+            con3(pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], step),
+            con1(pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], step),
+            con2(pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], step),
+            con3(pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], step),
+
+            con4(pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], m1, step, sprcon, eqdist),
+            con5(pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], m1, step, sprcon, eqdist),
+            con6(pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], m1, step, sprcon, eqdist),
+            con4(pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], m2, step, sprcon, eqdist),
+            con5(pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], m2, step, sprcon, eqdist),
+            con6(pos2n[0], val1[3], pos2n[1], val1[4], pos2n[2], val1[5], pos1n[0], val1[0], pos1n[1], val1[1], pos1n[2], val1[2], vel2n[0], val1[9], vel2n[1], val1[10], vel2n[2], val1[11], vel1n[0], val1[6], vel1n[1], val1[7], vel1n[2], val1[8], m2, step, sprcon, eqdist),       
+        ]))
+        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5], val1[6]+diff2[6], val1[7]+diff2[7], val1[8]+diff2[8], val1[9]+diff2[9], val1[10]+diff2[10], val1[11]+diff2[11]])       
+        val1 = val2
+        x=x+1
+    # print(val1)
+    return val1
 
 
 
