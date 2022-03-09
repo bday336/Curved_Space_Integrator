@@ -1,5 +1,5 @@
-from ..symint_bank import imph3sptrans
-from ..function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convert_rot2transh3
+from symint_bank import imph3sptrans
+from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convert_rot2transh3
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -7,104 +7,115 @@ from matplotlib import animation, rc
 import numpy as np
 from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
-#Initial position (position in rotational / velocity in chosen parameterization)
-#The initial conditions are given as an array of the data for each of the particles being
-# initialized. Each element is a particle with each element having 8 components
-# { ai , bi , gi , adi , bdi , gdi , mass , radius }
+# These are the parameter sweep loops over initial velocity, equilibrium length, spring stiffness
+tot_max_dist_arr=[]     # Array of maximum distance of masses
+tot_max_disp_arr=[]     # Array of maximum displacement of masses from equilibrium length of spring
+for v in arange(0,11.,1.):
+    for l in arange(0,11.,1.):
+        for k in arange(0,11.,1.):
+            print("On v={}, l={}, and k={}".format(v,l,k))
 
-#Initialize the particles in the simulation
-particles=array([
-    [.5,np.pi/2.,np.pi/2.,.5,.0,0.,1.,.2],          #particle 1
-    [.5,np.pi/2.,3./2.*np.pi,.5,.0,0.,1.,.2]        #particle 2
-    ])
+            #Initial position (position in rotational / velocity in chosen parameterization)
+            #The initial conditions are given as an array of the data for each of the particles being
+            # initialized. Each element is a particle with each element having 8 components
+            # { ai , bi , gi , adi , bdi , gdi , mass , radius }
 
-# Initialize the parameters of what I will consider the
-# sping system. This can be expanded on in the future with
-# something like a class object similar to the particle
-# table. The elements of each spring are given as
-# { particle1 , particle2 , spring constant (k) , equilibrium length of spring (l_{eq}) }
-spring=array([particles[0],particles[1],.5,1.])
+            #Initialize the particles in the simulation
+            particles=array([
+                [.5,np.pi/2.,np.pi/2.,v,.0,0.,1.,.2],          #particle 1
+                [.5,np.pi/2.,3./2.*np.pi,v,.0,0.,1.,.2]        #particle 2
+                ])
 
-#Intialize the time stepping for the integrator.
-delT=.01
-maxT=10+delT
+            # Initialize the parameters of what I will consider the
+            # sping system. This can be expanded on in the future with
+            # something like a class object similar to the particle
+            # table. The elements of each spring are given as
+            # { particle1 , particle2 , spring constant (k) , equilibrium length of spring (l_{eq}) }
+            spring=array([particles[0],particles[1],k,l])
 
-# Geodesic Trajectories
+            #Intialize the time stepping for the integrator.
+            delT=.01
+            maxT=10+delT
 
-# Position in translational parameterization
-positions = array([convert_rot2transh3(particles[0][:3]),convert_rot2transh3(particles[1][:3])])
-# Velocity given in translational parameterization
-velocities = array([particles[0][3:6], particles[1][3:6]])
+            # Geodesic Trajectories
 
-nump=maxT/delT
-timearr=np.arange(0,maxT,delT)
+            # Position in translational parameterization
+            positions = array([convert_rot2transh3(particles[0][:3]),convert_rot2transh3(particles[1][:3])])
+            # Velocity given in translational parameterization
+            velocities = array([particles[0][3:6], particles[1][3:6]])
 
-# Containers for trajectory data
-q = 0
-gat = []
-gbt = []
-ggt = []
-dist = []
+            nump=maxT/delT
+            timearr=np.arange(0,maxT,delT)
 
-# Include the intial data
-gat=append(gat, array([positions[0][0],positions[1][0]]))
-gbt=append(gbt, array([positions[0][1],positions[1][1]]))
-ggt=append(ggt, array([positions[0][2],positions[1][2]]))
+            # Containers for trajectory data
+            q = 0
+            gat = []
+            gbt = []
+            ggt = []
+            dist = []
 
-# Distance between masses
-dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+            # Include the intial data
+            gat=append(gat, array([positions[0][0],positions[1][0]]))
+            gbt=append(gbt, array([positions[0][1],positions[1][1]]))
+            ggt=append(ggt, array([positions[0][2],positions[1][2]]))
 
-# Numerical Integration step
-step_data=array([
-	imph3sptrans(positions[0], positions[1], velocities[0], velocities[1], delT, spring[0][6], spring[1][6], spring[2], spring[3])
-	])
+            # Distance between masses
+            dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
 
-# Include the first time step
-gat=append(gat, array([step_data[0][0],step_data[0][3]]))
-gbt=append(gbt, array([step_data[0][1],step_data[0][4]]))
-ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
+            # Numerical Integration step
+            step_data=array([
+                imph3sptrans(positions[0], positions[1], velocities[0], velocities[1], delT, spring[0][6], spring[1][6], spring[2], spring[3])
+                ])
 
-# Distance between masses
-dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+            # Include the first time step
+            gat=append(gat, array([step_data[0][0],step_data[0][3]]))
+            gbt=append(gbt, array([step_data[0][1],step_data[0][4]]))
+            ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
 
-q=q+1
+            # Distance between masses
+            dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
 
-# Iterate through each time step using data from the previous step in the trajectory
-while(q < nump-1):
-    # Collision detection check
-    #dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
-    if False: #dist<=particles[0][-1]+particles[1][-1]:
-        print("collided")
-        nextpos = array([step_data[0][:3], step_data[1][:3]])
-        nextdot= collisionh3(step_data[0][:3], step_data[1][:3],step_data[0][3:6], step_data[1][3:6],particles[0][6],particles[1][6],dist)
-    else:
-        nextpos = array([step_data[0][0:3], step_data[0][3:6]])
-        nextdot = array([step_data[0][6:9], step_data[0][9:]])
+            q=q+1
 
-    step_data=array([
-        imph3sptrans(nextpos[0], nextpos[1], nextdot[0], nextdot[1], delT, spring[0][6], spring[1][6], spring[2], spring[3])
-        ])
+            # Iterate through each time step using data from the previous step in the trajectory
+            while(q < nump-1):
+                # Collision detection check
+                #dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+                if False: #dist<=particles[0][-1]+particles[1][-1]:
+                    print("collided")
+                    nextpos = array([step_data[0][:3], step_data[1][:3]])
+                    nextdot= collisionh3(step_data[0][:3], step_data[1][:3],step_data[0][3:6], step_data[1][3:6],particles[0][6],particles[1][6],dist)
+                else:
+                    nextpos = array([step_data[0][0:3], step_data[0][3:6]])
+                    nextdot = array([step_data[0][6:9], step_data[0][9:]])
 
-    gat=append(gat, array([step_data[0][0],step_data[0][3]]))
-    gbt=append(gbt, array([step_data[0][1],step_data[0][4]]))
-    ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
+                step_data=array([
+                    imph3sptrans(nextpos[0], nextpos[1], nextdot[0], nextdot[1], delT, spring[0][6], spring[1][6], spring[2], spring[3])
+                    ])
 
-    # Distance between masses
-    dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+                gat=append(gat, array([step_data[0][0],step_data[0][3]]))
+                gbt=append(gbt, array([step_data[0][1],step_data[0][4]]))
+                ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
 
-    q=q+1
+                # Distance between masses
+                dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+
+                q=q+1
+
+            tot_max_dist_arr=append(tot_max_dist_arr,dist.max())
+            tot_max_disp_arr=append(tot_max_disp_arr,(dist.max()-l))
 
 
-# Transform into Poincare disk model for plotting
-gut=[]
-gvt=[]
-grt=[]
+# # Transform into Poincare disk model for plotting
+# gut=[]
+# gvt=[]
+# grt=[]
 
 
-for b in range(len(gat)):
-    gut=append(gut,sinh(gat[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
-    gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
-    grt=append(grt,cosh(gat[b])*cosh(gbt[b])*sinh(ggt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))	    	     		
+# for b in range(len(gat)):
+#     gut=append(gut,sinh(gat[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
+#     gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
+#     grt=append(grt,cosh(gat[b])*cosh(gbt[b])*sinh(ggt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))	    	     		
 
 #####################
 #  PLOTTING SECTION #
@@ -149,59 +160,59 @@ for b in range(len(gat)):
 ### Uncomment to just plot trajectory in the Poincare disk model with distance plots ###
 # --------------------------------------------------------------------------------------
 
-# Plot Trajectory with error
-fig = plt.figure(figsize=(12,4))
+# # Plot Trajectory with error
+# fig = plt.figure(figsize=(12,4))
 
-part1x,part1y,part1z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[0][7])
+# part1x,part1y,part1z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[0][7])
 
-ax1=fig.add_subplot(1,3,1,projection='3d')
+# ax1=fig.add_subplot(1,3,1,projection='3d')
 
-#draw sphere
-u, v = np.mgrid[0:np.pi+(np.pi)/15.:(np.pi)/15., 0:2.*np.pi+(2.*np.pi)/15.:(2.*np.pi)/15.]
-x = np.sin(u)*np.cos(v)
-y = np.sin(u)*np.sin(v)
-z = np.cos(u)
-ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
-ax1.set_xlim3d(-1,1)
-ax1.set_xlabel('X')
-ax1.set_ylim3d(-1,1)
-ax1.set_ylabel('Y')
-ax1.set_zlim3d(-1,1)
-ax1.set_zlabel('Z')
+# #draw sphere
+# u, v = np.mgrid[0:np.pi+(np.pi)/15.:(np.pi)/15., 0:2.*np.pi+(2.*np.pi)/15.:(2.*np.pi)/15.]
+# x = np.sin(u)*np.cos(v)
+# y = np.sin(u)*np.sin(v)
+# z = np.cos(u)
+# ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
+# ax1.set_xlim3d(-1,1)
+# ax1.set_xlabel('X')
+# ax1.set_ylim3d(-1,1)
+# ax1.set_ylabel('Y')
+# ax1.set_zlim3d(-1,1)
+# ax1.set_zlabel('Z')
 
-part1x,part1y,part1z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[0][7])
-part2x,part2y,part2z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[1][7])
+# part1x,part1y,part1z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[0][7])
+# part2x,part2y,part2z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[1][7])
 
-#draw trajectory
-ax1.plot3D(gut[0::2],gvt[0::2],grt[0::2], label="particle 1")
-ax1.plot3D(gut[1::2],gvt[1::2],grt[1::2], label="particle 2")
-ax1.legend(loc= 'lower left')
+# #draw trajectory
+# ax1.plot3D(gut[0::2],gvt[0::2],grt[0::2], label="particle 1")
+# ax1.plot3D(gut[1::2],gvt[1::2],grt[1::2], label="particle 2")
+# ax1.legend(loc= 'lower left')
 
-ax1.plot_surface(part1x, part1y, part1z, color="b")
-ax1.plot_surface(part2x, part2y, part2z, color="b")
+# ax1.plot_surface(part1x, part1y, part1z, color="b")
+# ax1.plot_surface(part2x, part2y, part2z, color="b")
 
-# Displacement Plot
-ax2=fig.add_subplot(1,3,2)
+# # Displacement Plot
+# ax2=fig.add_subplot(1,3,2)
 
-ax2.plot(timearr,(dist-spring[3]),label="displacement")
-#ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
-ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
-#ax2.set_yscale("log",basey=10)	
-#ax2.set_ylabel('displacement (m)')
-ax2.set_xlabel('time (s)')
-ax2.legend(loc='lower right')	
+# ax2.plot(timearr,(dist-spring[3]),label="displacement")
+# #ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
+# ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
+# #ax2.set_yscale("log",basey=10)	
+# #ax2.set_ylabel('displacement (m)')
+# ax2.set_xlabel('time (s)')
+# ax2.legend(loc='lower right')	
 
-# Force Plot
-ax3=fig.add_subplot(1,3,3)
+# # Force Plot
+# ax3=fig.add_subplot(1,3,3)
 
-ax3.plot(timearr,(dist-spring[3])*spring[2],label="force")
-# ax3.set_yscale("log",basey=10)
-ax3.set_xlabel('time (s)')	
-ax3.legend(loc='lower right')	
+# ax3.plot(timearr,(dist-spring[3])*spring[2],label="force")
+# # ax3.set_yscale("log",basey=10)
+# ax3.set_xlabel('time (s)')	
+# ax3.legend(loc='lower right')	
 
-fig.tight_layout()	
+# fig.tight_layout()	
 
-plt.show()
+# plt.show()
 
 # ------------------------------------------------------------------
 ### Uncomment to just generate gif of trajectory of the particle ###
