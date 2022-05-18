@@ -745,9 +745,260 @@ def imppbhcp(posn, posn1i, veln, veln1i, step, sourcemass, testmass):
 
 # -----------------------------------------------------------------------------------------
 
-###########################################
-### Hyperbolic 3-space Spring Potential ###
-###########################################
+#######################################################
+### Hyperbolic 2-space Spring Potential (Dumb-Bell) ###
+#######################################################
+
+# This is a pared down version of the 3D version below for running in H2.
+
+def imph2sptrans2(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
+
+    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
+    # I have found that I do not need to make functions for both particles since I can just flip the arguments
+    # and it should work fine since they are symmetric.
+
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2.
+    def D12(a1, b1, a2, b2):
+        return -sinh(a1)*sinh(a2) - cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)
+
+    # These are the first derivatives of the D12 function with respective to a1 and b1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only two functions are needed instead of four.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, a1, b1)
+    # db2D12 = db1D12(a2, b2, a1, b1)
+    def da1D12(a1, b1, a2, b2):
+        return -cosh(a1)*sinh(a2) - sinh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + sinh(a1)*cosh(b1)*cosh(a2)*cosh(b2)
+
+    def db1D12(a1, b1, a2, b2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*sinh(b1)*cosh(a2)*cosh(b2)    
+    
+
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, a2, and b2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only ten functions are needed instead of sixteen. Due to the symmetry of the partial
+    # derivatives the square matrix of sixteen values can be reduced to the upper triangular metrix. Of the ten values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to six
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, a1, b1)
+    # da2D12a2 = da1D12a1(a2, b2, a1, b1)
+
+    # db2D12a2 = db1D12a1(a2, b2, a1, b1)
+    # db2D12b2 = db1D12b1(a2, b2, a1, b1)
+
+    # For the remaining lower portion of the total square matrix of terms (six values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, a2, b2):
+        return -sinh(a1)*sinh(a2) - cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)
+
+    def db1D12a1(a1, b1, a2, b2):
+        return -sinh(a1)*cosh(b1)*cosh(a2)*sinh(b2) + sinh(a1)*sinh(b1)*cosh(a2)*cosh(b2)
+
+    def da2D12a1(a1, b1, a2, b2):
+        return -cosh(a1)*cosh(a2) - sinh(a1)*sinh(b1)*sinh(a2)*sinh(b2) + sinh(a1)*cosh(b1)*sinh(a2)*cosh(b2)
+
+    def db2D12a1(a1, b1, a2, b2):
+        return -sinh(a1)*sinh(b1)*cosh(a2)*cosh(b2) + sinh(a1)*cosh(b1)*cosh(a2)*sinh(b2)
+
+    def db1D12b1(a1, b1, a2, b2):
+        return -cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2) + cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2)
+
+    def db2D12b1(a1, b1, a2, b2):
+        return -cosh(a1)*cosh(b1)*cosh(a2)*cosh(b2) + cosh(a1)*sinh(b1)*cosh(a2)*sinh(b2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(a1, b1, a2, b2, m1, m2, k, xo):
+        # D function
+        d12=D12(a1, b1, a2, b2)
+        # First derivatives of D function
+        da1d12=da1D12(a1, b1, a2, b2)
+        db1d12=db1D12(a1, b1, a2, b2)
+        da2d12=da1D12(a2, b2, a1, b1)
+        db2d12=db1D12(a2, b2, a1, b1)
+        # Second derivatives of D function
+        da1d12a1=da1D12a1(a1, b1, a2, b2)
+        db1d12a1=db1D12a1(a1, b1, a2, b2)
+        da2d12a1=da2D12a1(a1, b1, a2, b2)
+        db2d12a1=db2D12a1(a1, b1, a2, b2)
+        
+        da1d12b1=db1d12a1
+        db1d12b1=db1D12b1(a1, b1, a2, b2)
+        da2d12b1 = db2D12a1(a2, b2, a1, b1)
+        db2d12b1=db2D12b1(a1, b1, a2, b2)
+
+        da1d12a2=da2d12a1
+        db1d12a2=da2d12b1
+        da2d12a2 = da1D12a1(a2, b2, a1, b1)
+        db2d12a2 = db1D12a1(a2, b2, a1, b1)
+
+        da1d12b2=db2d12a1
+        db1d12b2=db2d12b1
+        da2d12b2=db2d12a2
+        db2d12b2 = db1D12b1(a2, b2, a1, b1)
+
+        return array([
+            [-k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*da1d12/(d12**2. - 1.) - da1d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*db1d12/(d12**2. - 1.) - db1d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*da2d12/(d12**2. - 1.) - da2d12a1) ),
+            -k/(m1*1.*sqrt( d12**2. - 1. ))*( (da1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da1d12*0./1. + d12*da1d12*db2d12/(d12**2. - 1.) - db2d12a1) )],
+
+            [-k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d12*db1d12*da1d12/(d12**2. - 1.) - da1d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db1d12/(d12**2. - 1.) - db1d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*da2d12/(d12**2. - 1.) - da2d12b1) ),
+            -k/(m1*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db2d12/(d12**2. - 1.) - db2d12b1) )],
+
+            [-k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*da1d12/(d12**2. - 1.) - da1d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*db1d12/(d12**2. - 1.) - db1d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*da2d12/(d12**2. - 1.) - da2d12a2) ),
+            -k/(m2*1.*sqrt( d12**2. - 1. ))*( (da2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(da2d12*0./1. + d12*da2d12*db2d12/(d12**2. - 1.) - db2d12a2) )],
+
+            [-k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*da1d12/(d12**2. - 1.) - da1d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db1d12/(d12**2. - 1.) - db1d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d12*db2d12*da2d12/(d12**2. - 1.) - da2d12b2) ),
+            -k/(m2*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - xo )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db2d12/(d12**2. - 1.) - db2d12b2) )]
+
+        ])
+   
+    def con1(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
+        return an1 - an - .5*h*(adn + adn1)
+
+    def con2(an, an1, bn, bn1, adn, adn1, bdn, bdn1, h):
+        return bn1 - bn - .5*h*(bdn + bdn1)       
+
+    def con3(a1n, a1n1, b1n, b1n1, a2n, a2n1, b2n, b2n1, ad1n, ad1n1, bd1n, bd1n1, ad2n, ad2n1, bd2n, bd2n1, m1, h, k, xo):
+        return (ad1n1 - ad1n - .5*h*(
+            (bd1n*bd1n)*sinh(a1n)*cosh(a1n) - k/m1*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (-cosh(a1n)*sinh(a2n) - sinh(a1n)*sinh(b1n)*cosh(a2n)*sinh(b2n) + sinh(a1n)*cosh(b1n)*cosh(a2n)*cosh(b2n))/sqrt(-1. + 
+            (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n) - sinh(b1n)*sinh(b2n)))**2.)
+            + 
+            (bd1n1*bd1n1)*sinh(a1n1)*cosh(a1n1) - k/m1*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (-cosh(a1n1)*sinh(a2n1) - sinh(a1n1)*sinh(b1n1)*cosh(a2n1)*sinh(b2n1) + sinh(a1n1)*cosh(b1n1)*cosh(a2n1)*cosh(b2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1) - sinh(b1n1)*sinh(b2n1)))**2.) 
+            ))
+
+    def con4(a1n, a1n1, b1n, b1n1, a2n, a2n1, b2n, b2n1, ad1n, ad1n1, bd1n, bd1n1, ad2n, ad2n1, bd2n, bd2n1, m1, h, k, xo):
+        return (bd1n1 - bd1n - .5*h*(
+            -2.*ad1n*bd1n*tanh(a1n) - k/(m1*cosh(a1n)*cosh(a1n))*( 
+            arccosh(-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n) - sinh(b1n)*sinh(b2n))) - xo)*
+            (-cosh(a1n)*cosh(b1n)*cosh(a2n)*sinh(b2n) + cosh(a1n)*sinh(b1n)*cosh(a2n)*cosh(b2n))/sqrt(-1. + 
+            (-sinh(a1n)*sinh(a2n) + cosh(a1n)*cosh(a2n)*(cosh(b1n)*cosh(b2n) - sinh(b1n)*sinh(b2n)))**2.)
+            + 
+            -2.*ad1n1*bd1n1*tanh(a1n1) - k/(m1*cosh(a1n1)*cosh(a1n1))*( 
+            arccosh(-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1) - sinh(b1n1)*sinh(b2n1))) - xo)*
+            (-cosh(a1n1)*cosh(b1n1)*cosh(a2n1)*sinh(b2n1) + cosh(a1n1)*sinh(b1n1)*cosh(a2n1)*cosh(b2n1))/sqrt(-1. + 
+            (-sinh(a1n1)*sinh(a2n1) + cosh(a1n1)*cosh(a2n1)*(cosh(b1n1)*cosh(b2n1) - sinh(b1n1)*sinh(b2n1)))**2.)  
+            ))
+    
+    def jacobian(a1n1, b1n1, a2n1, b2n1, ad1n1, bd1n1, ad2n1, bd2n1, m1, m2, h, k, xo):
+        spring_terms=jacobi_sp_terms(a1n1, b1n1, a2n1, b2n1, m1, m2, k, xo)
+        return array([
+            [1.,0., 0.,0., -.5*h,0., 0.,0.],
+            [0.,1., 0.,0., 0.,-.5*h, 0.,0.],
+
+            [0.,0., 1.,0., 0.,0., -.5*h,0.],
+            [0.,0., 0.,1., 0.,0., 0.,-.5*h],
+
+            # ad1 update
+            [-.5*h*(bd1n1*bd1n1)*cosh(2.*a1n1) + spring_terms[0,0],
+            0. + spring_terms[0,1], 
+            
+            spring_terms[0,2],
+            spring_terms[0,3],
+            
+            1.,
+            -.5*h*sinh(2.*a1n1)*bd1n1,
+
+            0.,
+            0.],
+
+            # bd1 update
+            [h*ad1n1*bd1n1/(cosh(a1n1)*cosh(a1n1)) + spring_terms[1,0],
+            0. + spring_terms[1,1],
+            
+            spring_terms[1,2],
+            spring_terms[1,3],
+            
+            h*tanh(a1n1)*bd1n1,
+            1.+h*tanh(a1n1)*ad1n1,
+
+            0.,
+            0.],
+
+            # ad2 update
+            [spring_terms[2,0],
+            spring_terms[2,1],
+
+            -.5*h*(bd2n1*bd2n1)*cosh(2.*a2n1) + spring_terms[2,2],
+            0. + spring_terms[2,3],
+
+            0.,
+            0.,
+
+            1.,
+            -.5*h*sinh(2.*a2n1)*bd2n1],
+
+            # bd2 update
+            [spring_terms[3,0],
+            spring_terms[3,1],
+
+            h*ad2n1*bd2n1/(cosh(a2n1)*cosh(a2n1)) + spring_terms[3,2],
+            0. + spring_terms[3,3],
+
+            0.,
+            0.,
+
+            h*tanh(a2n1)*bd2n1,
+            1.+h*tanh(a2n1)*ad2n1]
+        ])
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    diff1=linalg.solve(jacobian(pos1n[0], pos1n[1], pos2n[0], pos2n[1], vel1n[0], vel1n[1], vel2n[0], vel2n[1], m1, m2, step, sprcon, eqdist),-array([
+        con1(pos1n[0], pos1n[0], pos1n[1], pos1n[1], vel1n[0], vel1n[0], vel1n[1], vel1n[1], step),
+        con2(pos1n[0], pos1n[0], pos1n[1], pos1n[1], vel1n[0], vel1n[0], vel1n[1], vel1n[1], step),
+        con1(pos2n[0], pos2n[0], pos2n[1], pos2n[1], vel2n[0], vel2n[0], vel2n[1], vel2n[1], step),
+        con2(pos2n[0], pos2n[0], pos2n[1], pos2n[1], vel2n[0], vel2n[0], vel2n[1], vel2n[1], step),
+
+        con3(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos2n[0], pos2n[0], pos2n[1], pos2n[1], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel2n[0], vel2n[0], vel2n[1], vel2n[1], m1, step, sprcon, eqdist),
+        con4(pos1n[0], pos1n[0], pos1n[1], pos1n[1], pos2n[0], pos2n[0], pos2n[1], pos2n[1], vel1n[0], vel1n[0], vel1n[1], vel1n[1], vel2n[0], vel2n[0], vel2n[1], vel2n[1], m1, step, sprcon, eqdist),
+        con3(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos1n[0], pos1n[0], pos1n[1], pos1n[1], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel1n[0], vel1n[0], vel1n[1], vel1n[1], m2, step, sprcon, eqdist),
+        con4(pos2n[0], pos2n[0], pos2n[1], pos2n[1], pos1n[0], pos1n[0], pos1n[1], pos1n[1], vel2n[0], vel2n[0], vel2n[1], vel2n[1], vel1n[0], vel1n[0], vel1n[1], vel1n[1], m2, step, sprcon, eqdist),      
+    ]))
+    val1 = array([pos1n[0]+diff1[0], pos1n[1]+diff1[1], pos2n[0]+diff1[2], pos2n[1]+diff1[3], vel1n[0]+diff1[4], vel1n[1]+diff1[5], vel2n[0]+diff1[6], vel2n[1]+diff1[7]])    
+    x = 0
+    while(x < 7):
+        diff2=linalg.solve(jacobian(val1[0], val1[1], val1[2], val1[3], val1[4], val1[5], val1[6], val1[7], m1, m2, step, sprcon, eqdist),-array([
+            con1(pos1n[0], val1[0], pos1n[1], val1[1], vel1n[0], val1[4], vel1n[1], val1[5], step),
+            con2(pos1n[0], val1[0], pos1n[1], val1[1], vel1n[0], val1[4], vel1n[1], val1[5], step),
+            con1(pos2n[0], val1[2], pos2n[1], val1[3], vel2n[0], val1[6], vel2n[1], val1[7], step),
+            con2(pos2n[0], val1[2], pos2n[1], val1[3], vel2n[0], val1[6], vel2n[1], val1[7], step),
+
+            con3(pos1n[0], val1[0], pos1n[1], val1[1], pos2n[0], val1[2], pos2n[1], val1[3], vel1n[0], val1[4], vel1n[1], val1[5], vel2n[0], val1[6], vel2n[1], val1[7], m1, step, sprcon, eqdist),
+            con4(pos1n[0], val1[0], pos1n[1], val1[1], pos2n[0], val1[2], pos2n[1], val1[3], vel1n[0], val1[4], vel1n[1], val1[5], vel2n[0], val1[6], vel2n[1], val1[7], m1, step, sprcon, eqdist),
+            con3(pos2n[0], val1[2], pos2n[1], val1[3], pos1n[0], val1[0], pos1n[1], val1[1], vel2n[0], val1[6], vel2n[1], val1[7], vel1n[0], val1[4], vel1n[1], val1[5], m2, step, sprcon, eqdist),
+            con4(pos2n[0], val1[2], pos2n[1], val1[3], pos1n[0], val1[0], pos1n[1], val1[1], vel2n[0], val1[6], vel2n[1], val1[7], vel1n[0], val1[4], vel1n[1], val1[5], m2, step, sprcon, eqdist),      
+        ]))
+        val2 = array([val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5], val1[6]+diff2[6], val1[7]+diff2[7]])       
+        val1 = val2
+        x=x+1
+    # print(val1)
+    return val1
+
+#######################################################
+### Hyperbolic 3-space Spring Potential (Dumb-Bell) ###
+#######################################################
 
 # This took a lot more of work than I anticipated to make sure that the Newton solver
 # jacobian was correct, but it is finally updated and actually correct now. Currently,
@@ -1153,9 +1404,9 @@ def imph3sptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
     # print(val1)
     return val1
 
-#####################################
-### H2xE 3-space Spring Potential ###
-#####################################
+#################################################
+### H2xE 3-space Spring Potential (Dumb-Bell) ###
+#################################################
 
 def imph2esptrans(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
 
