@@ -1,4 +1,4 @@
-from symint_bank import imph3sptrans
+from symint_bank import imph3sptrans2
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convert_rot2transh3
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -56,7 +56,7 @@ dist=append(dist,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])
 
 # Numerical Integration step
 step_data=array([
-	imph3sptrans(positions[0], positions[1], velocities[0], velocities[1], delT, spring[0][6], spring[1][6], spring[2], spring[3])
+	imph3sptrans2(positions[0], positions[1], velocities[0], velocities[1], delT, spring[0][6], spring[1][6], spring[2], spring[3])
 	])
 
 # Include the first time step
