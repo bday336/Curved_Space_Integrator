@@ -18,7 +18,7 @@ def hyper2poinh3(point):
 def hyper2poinh2e(point): 
 	return array([point[0]/(point[3] + 1.), point[1]/(point[3] + 1.), point[2]])
 
-# Convert from rotational parameterization to translational parameterization
+# Convert from rotational parameterization to translational parameterization (position)
 # (Probably should add the inverse at some point)
 
 def convert_rot2transh2(rot_vec):
@@ -29,6 +29,13 @@ def convert_rot2transh3(rot_vec):
 
 def convert_rot2transh2e(rot_vec):
    return array([arcsinh(sinh(rot_vec[0])*cos(rot_vec[1])), arctanh(tanh(rot_vec[0])*sin(rot_vec[1])), rot_vec[2]])
+
+# Convert from rotational parameterization to translational parameterization (velocity)
+# (Probably should add the inverse at some point)
+
+def convert_rot2transh2vel(rot_pos,rot_vel):
+   trans_pos=convert_rot2transh2(rot_pos)
+   return array([(rot_vel[0]*cosh(rot_pos[0])*cos(rot_pos[1])-rot_vel[1]*sinh(rot_pos[0])*sin(rot_pos[1]))/(cosh(trans_pos[0])), (rot_vel[0]*(cosh(rot_pos[0])*sin(rot_pos[1])*cosh(trans_pos[1])-sinh(rot_pos[0])*sinh(trans_pos[1]))+rot_vel[1]*sinh(rot_pos[0])*cos(rot_pos[1])*cosh(trans_pos[1]))/(cosh(trans_pos[0]))])
 
 # Convert from hyperboloid model to translational parameterization (position)
 

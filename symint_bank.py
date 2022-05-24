@@ -1411,6 +1411,8 @@ def imph3sptrans2(pos1n, pos2n, vel1n, vel2n, step, m1, m2, sprcon, eqdist):
 
 # This is an extension of the dumb-bell system using the structure for the cube
 # solver. The configuration is a triangle of three masses and three springs. 
+# There seems to be some issue with this setup. While the solver works for 
+# the case of three masses even though the cube solver works fine.
 
 def imph3sptrans3(posn_arr, veln_arr, step, mass_arr, spring_arr):
 
@@ -2031,7 +2033,7 @@ def imph3sptrans3(posn_arr, veln_arr, step, mass_arr, spring_arr):
         ad2n1,bd2n1,gd2n1=velocities[1]
         ad3n1,bd3n1,gd3n1=velocities[2]
         spring_terms=jacobi_sp_terms(positions, mass_arr, spring_arr)
-        #print(spring_terms[0][0])
+        #print(spring_terms)
         return array([
             [1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0., 0.,0.,0.],
             [0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0., 0.,0.,0.],
@@ -2292,13 +2294,13 @@ def imph3sptrans3(posn_arr, veln_arr, step, mass_arr, spring_arr):
             con5(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
             con6(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
             #v2
-            con4(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[3],new_pos_arr[3],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
-            con5(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[3],new_pos_arr[3],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
-            con6(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[3],new_pos_arr[3],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con4(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con5(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con6(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
             #v3
-            con4(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[3],new_pos_arr[3],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
-            con5(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[3],new_pos_arr[3],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
-            con6(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[3],new_pos_arr[3],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2])    
+            con4(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con5(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con6(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2])    
         ]))      
         val2 = array([
             val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], 
@@ -2311,7 +2313,7 @@ def imph3sptrans3(posn_arr, veln_arr, step, mass_arr, spring_arr):
             ])
         val1 = val2
         x=x+1
-    # print(val1)
+    #print(val1[9:17])
     return val1
 
 #################################################
