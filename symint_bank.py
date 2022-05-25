@@ -2316,6 +2316,918 @@ def imph3sptrans3(posn_arr, veln_arr, step, mass_arr, spring_arr):
     #print(val1[9:17])
     return val1
 
+# This is an extension of the dumb-bell system using the structure for the cube
+# solver. The configuration is a triangle of three masses and three springs. 
+# I found that for the case of shapes with odd number rotational symmetry
+# that the translational parameterization is not appropriate due to the 
+# metric factors being unequal for point with degenerate mirror symmetry 
+# compared to the remaining points that have a mirror point. Since it is a 
+# coordinate issue, we need to use the rotational coordinate system to remove
+# this artifical directional bias.
+
+def imph3sprot3(posn_arr, veln_arr, step, mass_arr, spring_arr):
+
+    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
+    # I have found that I do not need to make functions for both particles since I can just flip the arguments
+    # and it should work fine since they are symmetric. In principle, I think that I do not need to generate
+    # any new functions for this system. I just have to be careful with the arguments I use in the functions.
+    # In spring terms are more numerous given that each particle is connected to three other particles. When 
+    # using the below functions the more general notation of Dmn just needs to be considered with 1=m and 2=n.
+    # This is so I do not introduce any unintended errors by changing the variables.
+
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2. This can be used as a general function
+    # I just have to be careful about the arguments for the various particle pairs.
+    def D12(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only three functions are needed instead of six.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
+    # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
+    # dg2D12 = dg1D12(a2, b2, g2, a1, b1, g1)
+    def da1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2) 
+
+    def dg1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)      
+    
+
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
+    # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+    # dg2D12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+    # db2D12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+    # dg2D12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+    # dg2D12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+    # For the remaining lower portion of the total square matrix of terms (fifteen values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*cos(b2) - cosh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def da2D12a1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sinh(a2) - cosh(a1)*cos(b1)*cosh(a2)*cos(b2) - cosh(a1)*sin(b1)*cosh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db2D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cos(b1)*sinh(a2)*sin(b2) - cosh(a1)*sin(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12a1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*cos(b2) + sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def dg1D12g1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg2D12g1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(positions, mass_arr, spring_arr):
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        a3,b3,g3=positions[2]
+        
+        
+        ### Spring 1-2 spring_arr[0]###
+        # D function
+        d12=D12(a1, b1, g1, a2, b2, g2)
+        # First derivatives of D function
+        da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+        db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+        dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+        da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+        db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+        dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+        # Second derivatives of D function
+        da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+        db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+        dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+        da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+        db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+        dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
+        
+        da1d12b1=db1d12a1
+        db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+        dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+        da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+        dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+        da1d12g1=dg1d12a1
+        db1d12g1=dg1d12b1
+        dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+        da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+        dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+        da1d12a2=da2d12a1
+        db1d12a2=da2d12b1
+        dg1d12a2=da2d12g1
+        da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+        db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+        dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+        da1d12b2=db2d12a1
+        db1d12b2=db2d12b1
+        dg1d12b2=db2d12g1
+        da2d12b2=db2d12a2
+        db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+        dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+        da1d12g2=dg2d12a1
+        db1d12g2=dg2d12b1
+        dg1d12g2=dg2d12g1
+        da2d12g2=dg2d12a2
+        db2d12g2=dg2d12b2
+        dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+
+        ### Spring 1-3 spring_arr[1]###
+        # D function
+        d13=D12(a1, b1, g1, a3, b3, g3)
+        # First derivatives of D function
+        da1d13=da1D12(a1, b1, g1, a3, b3, g3)
+        db1d13=db1D12(a1, b1, g1, a3, b3, g3)
+        dg1d13=dg1D12(a1, b1, g1, a3, b3, g3)
+        da3d13=da1D12(a3, b3, g3, a1, b1, g1)
+        db3d13=db1D12(a3, b3, g3, a1, b1, g1)
+        dg3d13=dg1D12(a3, b3, g3, a1, b1, g1)
+        # Second derivatives of D function
+        da1d13a1=da1D12a1(a1, b1, g1, a3, b3, g3)
+        db1d13a1=db1D12a1(a1, b1, g1, a3, b3, g3)
+        dg1d13a1=dg1D12a1(a1, b1, g1, a3, b3, g3)
+        da3d13a1=da2D12a1(a1, b1, g1, a3, b3, g3)
+        db3d13a1=db2D12a1(a1, b1, g1, a3, b3, g3)
+        dg3d13a1=dg2D12a1(a1, b1, g1, a3, b3, g3)
+        
+        da1d13b1=db1d13a1
+        db1d13b1=db1D12b1(a1, b1, g1, a3, b3, g3)
+        dg1d13b1=dg1D12b1(a1, b1, g1, a3, b3, g3)
+        da3d13b1 = db2D12a1(a3, b3, g3, a1, b1, g1)
+        db3d13b1=db2D12b1(a1, b1, g1, a3, b3, g3)
+        dg3d13b1=dg2D12b1(a1, b1, g1, a3, b3, g3)
+
+        da1d13g1=dg1d13a1
+        db1d13g1=dg1d13b1
+        dg1d13g1=dg1D12g1(a1, b1, g1, a3, b3, g3)
+        da3d13g1 = dg2D12a1(a3, b3, g3, a1, b1, g1)
+        db3d13g1 = dg2D12b1(a3, b3, g3, a1, b1, g1)
+        dg3d13g1=dg2D12g1(a1, b1, g1, a3, b3, g3)
+
+        da1d13a3=da3d13a1
+        db1d13a3=da3d13b1
+        dg1d13a3=da3d13g1
+        da3d13a3 = da1D12a1(a3, b3, g3, a1, b1, g1)
+        db3d13a3 = db1D12a1(a3, b3, g3, a1, b1, g1)
+        dg3d13a3 = dg1D12a1(a3, b3, g3, a1, b1, g1)
+
+        da1d13b3=db3d13a1
+        db1d13b3=db3d13b1
+        dg1d13b3=db3d13g1
+        da3d13b3=db3d13a3
+        db3d13b3 = db1D12b1(a3, b3, g3, a1, b1, g1)
+        dg3d13b3 = dg1D12b1(a3, b3, g3, a1, b1, g1)
+
+        da1d13g3=dg3d13a1
+        db1d13g3=dg3d13b1
+        dg1d13g3=dg3d13g1
+        da3d13g3=dg3d13a3
+        db3d13g3=dg3d13b3
+        dg3d13g3 = dg1D12g1(a3, b3, g3, a1, b1, g1)
+
+
+        ### Spring 2-3 spring_arr[2]###
+        # D function
+        d23=D12(a2, b2, g2, a3, b3, g3)
+        # First derivatives of D function
+        da2d23=da1D12(a2, b2, g2, a3, b3, g3)
+        db2d23=db1D12(a2, b2, g2, a3, b3, g3)
+        dg2d23=dg1D12(a2, b2, g2, a3, b3, g3)
+        da3d23=da1D12(a3, b3, g3, a2, b2, g2)
+        db3d23=db1D12(a3, b3, g3, a2, b2, g2)
+        dg3d23=dg1D12(a3, b3, g3, a2, b2, g2)
+        # Second derivatives of D function
+        da2d23a2=da1D12a1(a2, b2, g2, a3, b3, g3)
+        db2d23a2=db1D12a1(a2, b2, g2, a3, b3, g3)
+        dg2d23a2=dg1D12a1(a2, b2, g2, a3, b3, g3)
+        da3d23a2=da2D12a1(a2, b2, g2, a3, b3, g3)
+        db3d23a2=db2D12a1(a2, b2, g2, a3, b3, g3)
+        dg3d23a2=dg2D12a1(a2, b2, g2, a3, b3, g3)
+        
+        da2d23b2=db2d23a2
+        db2d23b2=db1D12b1(a2, b2, g2, a3, b3, g3)
+        dg2d23b2=dg1D12b1(a2, b2, g2, a3, b3, g3)
+        da3d23b2 = db2D12a1(a3, b3, g3, a2, b2, g2)
+        db3d23b2=db2D12b1(a2, b2, g2, a3, b3, g3)
+        dg3d23b2=dg2D12b1(a2, b2, g2, a3, b3, g3)
+
+        da2d23g2=dg2d23a2
+        db2d23g2=dg2d23b2
+        dg2d23g2=dg1D12g1(a2, b2, g2, a3, b3, g3)
+        da3d23g2 = dg2D12a1(a3, b3, g3, a2, b2, g2)
+        db3d23g2 = dg2D12b1(a3, b3, g3, a2, b2, g2)
+        dg3d23g2=dg2D12g1(a2, b2, g2, a3, b3, g3)
+
+        da2d23a3=da3d23a2
+        db2d23a3=da3d23b2
+        dg2d23a3=da3d23g2
+        da3d23a3 = da1D12a1(a3, b3, g3, a2, b2, g2)
+        db3d23a3 = db1D12a1(a3, b3, g3, a2, b2, g2)
+        dg3d23a3 = dg1D12a1(a3, b3, g3, a2, b2, g2)
+
+        da2d23b3=db3d23a2
+        db2d23b3=db3d23b2
+        dg2d23b3=db3d23g2
+        da3d23b3=db3d23a3
+        db3d23b3 = db1D12b1(a3, b3, g3, a2, b2, g2)
+        dg3d23b3 = dg1D12b1(a3, b3, g3, a2, b2, g2)
+
+        da2d23g3=dg3d23a2
+        db2d23g3=dg3d23b2
+        dg2d23g3=dg3d23g2
+        da3d23g3=dg3d23a3
+        db3d23g3=dg3d23b3
+        dg3d23g3 = dg1D12g1(a3, b3, g3, a2, b2, g2)
+        
+
+        return array([
+
+            # ---------- #
+            #     V1     #
+            # ---------- #
+            
+            # ad1 a1
+            [-spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*da1d12/(d12**2. - 1.) - da1d12a1) ) + 
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*da1d13/(d13**2. - 1.) - da1d13a1) ),
+
+            # ad1 b1
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*db1d12/(d12**2. - 1.) - db1d12a1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*db1d13/(d13**2. - 1.) - db1d13a1) ),
+
+            # ad1 g1
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*dg1d12/(d12**2. - 1.) - dg1d12a1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*dg1d13/(d13**2. - 1.) - dg1d13a1) ),
+
+            # ad1 a2,b2,g2
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*da2d12/(d12**2. - 1.) - da2d12a1) ),
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*db2d12/(d12**2. - 1.) - db2d12a1) ),
+            -spring_arr[0][0]/(mass_arr[0]*1.*sqrt( d12**2. - 1. ))*( (da1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da1d12*0./1. + d12*da1d12*dg2d12/(d12**2. - 1.) - dg2d12a1) ),
+
+            # ad1 a3,b3,g3
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*da3d13/(d13**2. - 1.) - da3d13a1) ),
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*db3d13/(d13**2. - 1.) - db3d13a1) ),
+            -spring_arr[1][0]/(mass_arr[0]*1.*sqrt( d13**2. - 1. ))*( (da1d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da1d13*0./1. + d13*da1d13*dg3d13/(d13**2. - 1.) - dg3d13a1) )
+            ],
+
+            # ---------- #
+
+            # bd1 a1
+            [-spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d12*db1d12*da1d12/(d12**2. - 1.) - da1d12b1) ) + 
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*sinh(2.*a1)/(cosh(a1)*cosh(a1)) + d13*db1d13*da1d13/(d13**2. - 1.) - da1d13b1) ),
+
+            # bd1 b1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db1d12/(d12**2. - 1.) - db1d12b1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*db1d13/(d13**2. - 1.) - db1d13b1) ),
+
+            # bd1 g1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*dg1d12/(d12**2. - 1.) - dg1d12b1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*dg1d13/(d13**2. - 1.) - dg1d13b1) ),
+
+            # bd1 a2,b2,g2
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*da2d12/(d12**2. - 1.) - da2d12b1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*db2d12/(d12**2. - 1.) - db2d12b1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d12**2. - 1. ))*( (db1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db1d12*0./(cosh(a1)*cosh(a1)) + d12*db1d12*dg2d12/(d12**2. - 1.) - dg2d12b1) ),
+
+            # bd1 a3,b3,g3
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*da3d13/(d13**2. - 1.) - da3d13b1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*db3d13/(d13**2. - 1.) - db3d13b1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*sqrt( d13**2. - 1. ))*( (db1d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db1d13*0./(cosh(a1)*cosh(a1)) + d13*db1d13*dg3d13/(d13**2. - 1.) - dg3d13b1) ),
+            ],
+
+            # ---------- #
+
+            # gd1 a1
+            [-spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*sinh(2.*a1)*cosh(b1)*cosh(b1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*da1d12/(d12**2. - 1.) - da1d12g1) ) + 
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*sinh(2.*a1)*cosh(b1)*cosh(b1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*da1d13/(d13**2. - 1.) - da1d13g1) ),
+
+            # gd1 b1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*sinh(2.*b1)*cosh(a1)*cosh(a1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*db1d12/(d12**2. - 1.) - db1d12g1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*sinh(2.*b1)*cosh(a1)*cosh(a1)/(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*db1d13/(d13**2. - 1.) - db1d13g1) ),
+
+            # gd1 g1
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*dg1d12/(d12**2. - 1.) - dg1d12g1) ) +
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*dg1d13/(d13**2. - 1.) - dg1d13g1) ),
+
+            # gd1 a2,b2,g2
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*da2d12/(d12**2. - 1.) - da2d12g1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*db2d12/(d12**2. - 1.) - db2d12g1) ),
+            -spring_arr[0][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d12**2. - 1. ))*( (dg1d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg1d12*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d12*dg1d12*dg2d12/(d12**2. - 1.) - dg2d12g1) ),
+
+            # gd1 a3,b3,g3
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*da3d13/(d13**2. - 1.) - da3d13g1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*db3d13/(d13**2. - 1.) - db3d13g1) ),
+            -spring_arr[1][0]/(mass_arr[0]*cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)*sqrt( d13**2. - 1. ))*( (dg1d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg1d13*0./(cosh(a1)*cosh(a1)*cosh(b1)*cosh(b1)) + d13*dg1d13*dg3d13/(d13**2. - 1.) - dg3d13g1) ),
+            ],
+
+            # ---------- #
+            #     V2     #
+            # ---------- #
+
+            # ad2 a1,b1,g1
+            [-spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*da1d12/(d12**2. - 1.) - da1d12a2) ),
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*db1d12/(d12**2. - 1.) - db1d12a2) ),
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*dg1d12/(d12**2. - 1.) - dg1d12a2) ),
+
+            # ad2 a2
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*da2d12/(d12**2. - 1.) - da2d12a2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*1.*sqrt( d23**2. - 1. ))*( (da2d23*da2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da2d23*0./1. + d23*da2d23*da2d23/(d23**2. - 1.) - da2d23a2) ),
+
+            # ad2 b2
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*db2d12/(d12**2. - 1.) - db2d12a2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*1.*sqrt( d23**2. - 1. ))*( (da2d23*db2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da2d23*0./1. + d23*da2d23*db2d23/(d23**2. - 1.) - db2d23a2) ),
+
+            # ad2 g2
+            -spring_arr[0][0]/(mass_arr[1]*1.*sqrt( d12**2. - 1. ))*( (da2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(da2d12*0./1. + d12*da2d12*dg2d12/(d12**2. - 1.) - dg2d12a2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*1.*sqrt( d23**2. - 1. ))*( (da2d23*dg2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da2d23*0./1. + d23*da2d23*dg2d23/(d23**2. - 1.) - dg2d23a2) ),
+
+            # ad2 a3,b3,g3
+            -spring_arr[2][0]/(mass_arr[1]*1.*sqrt( d23**2. - 1. ))*( (da2d23*da3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da2d23*0./1. + d23*da2d23*da3d23/(d23**2. - 1.) - da3d23a2) ),
+            -spring_arr[2][0]/(mass_arr[1]*1.*sqrt( d23**2. - 1. ))*( (da2d23*db3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da2d23*0./1. + d23*da2d23*db3d23/(d23**2. - 1.) - db3d23a2) ),
+            -spring_arr[2][0]/(mass_arr[1]*1.*sqrt( d23**2. - 1. ))*( (da2d23*dg3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da2d23*0./1. + d23*da2d23*dg3d23/(d23**2. - 1.) - dg3d23a2) ),
+            ],
+
+            # ---------- #
+
+            # bd2 a1,b1,g1
+            [-spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*da1d12/(d12**2. - 1.) - da1d12b2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db1d12/(d12**2. - 1.) - db1d12b2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*dg1d12/(d12**2. - 1.) - dg1d12b2) ),
+
+            # bd2 a2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d12*db2d12*da2d12/(d12**2. - 1.) - da2d12b2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d23**2. - 1. ))*( (db2d23*da2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db2d23*sinh(2.*a2)/(cosh(a2)*cosh(a2)) + d23*db2d23*da2d23/(d23**2. - 1.) - da2d23b2) ),
+
+            # bd2 b2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*db2d12/(d12**2. - 1.) - db2d12b2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d23**2. - 1. ))*( (db2d23*db2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db2d23*0./(cosh(a2)*cosh(a2)) + d23*db2d23*db2d23/(d23**2. - 1.) - db2d23b2) ),
+
+            # bd2 g2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d12**2. - 1. ))*( (db2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(db2d12*0./(cosh(a2)*cosh(a2)) + d12*db2d12*dg2d12/(d12**2. - 1.) - dg2d12b2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d23**2. - 1. ))*( (db2d23*dg2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db2d23*0./(cosh(a2)*cosh(a2)) + d23*db2d23*dg2d23/(d23**2. - 1.) - dg2d23b2) ),
+
+            # bd2 a3,b3,g3
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d23**2. - 1. ))*( (db2d23*da3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db2d23*0./(cosh(a2)*cosh(a2)) + d23*db2d23*da3d23/(d23**2. - 1.) - da3d23b2) ),
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d23**2. - 1. ))*( (db2d23*db3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db2d23*0./(cosh(a2)*cosh(a2)) + d23*db2d23*db3d23/(d23**2. - 1.) - db3d23b2) ),
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*sqrt( d23**2. - 1. ))*( (db2d23*dg3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db2d23*0./(cosh(a2)*cosh(a2)) + d23*db2d23*dg3d23/(d23**2. - 1.) - dg3d23b2) ),
+            ],
+
+            # ---------- #
+
+            # gd2 a1,b1,g1
+            [-spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*da1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*da1d12/(d12**2. - 1.) - da1d12g2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*db1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*db1d12/(d12**2. - 1.) - db1d12g2) ),
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*dg1d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*dg1d12/(d12**2. - 1.) - dg1d12g2) ),
+
+            # gd2 a2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*da2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*sinh(2.*a2)*cosh(b2)*cosh(b2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*da2d12/(d12**2. - 1.) - da2d12g2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d23**2. - 1. ))*( (dg2d23*da2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg2d23*sinh(2.*a2)*cosh(b2)*cosh(b2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d23*dg2d23*da2d23/(d23**2. - 1.) - da2d23g2) ),
+
+            # gd2 b2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*db2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*sinh(2.*b2)*cosh(a2)*cosh(a2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*db2d12/(d12**2. - 1.) - db2d12g2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d23**2. - 1. ))*( (dg2d23*db2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg2d23*sinh(2.*b2)*cosh(a2)*cosh(a2)/(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d23*dg2d23*db2d23/(d23**2. - 1.) - db2d23g2) ),
+
+            # gd2 g2
+            -spring_arr[0][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d12**2. - 1. ))*( (dg2d12*dg2d12)/sqrt( d12**2. - 1.) - ( arccosh(d12) - spring_arr[0][1] )*(dg2d12*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d12*dg2d12*dg2d12/(d12**2. - 1.) - dg2d12g2) ) + 
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d23**2. - 1. ))*( (dg2d23*dg2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg2d23*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d23*dg2d23*dg2d23/(d23**2. - 1.) - dg2d23g2) ),
+
+            # gd2 a3,b3,g3
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d23**2. - 1. ))*( (dg2d23*da3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg2d23*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d23*dg2d23*da3d23/(d23**2. - 1.) - da3d23g2) ),
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d23**2. - 1. ))*( (dg2d23*db3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg2d23*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d23*dg2d23*db3d23/(d23**2. - 1.) - db3d23g2) ),
+            -spring_arr[2][0]/(mass_arr[1]*cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)*sqrt( d23**2. - 1. ))*( (dg2d23*dg3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg2d23*0./(cosh(a2)*cosh(a2)*cosh(b2)*cosh(b2)) + d23*dg2d23*dg3d23/(d23**2. - 1.) - dg3d23g2) ),
+            ],
+
+            # ---------- #
+            #     V3     #
+            # ---------- #
+
+            # ad3 a1,b1,g1
+            [-spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*da1d13/(d13**2. - 1.) - da1d13a3) ),
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*db1d13/(d13**2. - 1.) - db1d13a3) ),
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*dg1d13/(d13**2. - 1.) - dg1d13a3) ),
+
+            # ad3 a2,b2,g2
+            -spring_arr[2][0]/(mass_arr[2]*1.*sqrt( d23**2. - 1. ))*( (da3d23*da2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da3d23*0./1. + d23*da3d23*da2d23/(d23**2. - 1.) - da2d23a3) ),
+            -spring_arr[2][0]/(mass_arr[2]*1.*sqrt( d23**2. - 1. ))*( (da3d23*db2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da3d23*0./1. + d23*da3d23*db2d23/(d23**2. - 1.) - db2d23a3) ),
+            -spring_arr[2][0]/(mass_arr[2]*1.*sqrt( d23**2. - 1. ))*( (da3d23*dg2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da3d23*0./1. + d23*da3d23*dg2d23/(d23**2. - 1.) - dg2d23a3) ),
+
+            # ad3 a3
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*da3d13/(d13**2. - 1.) - da3d13a3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*1.*sqrt( d23**2. - 1. ))*( (da3d23*da3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da3d23*0./1. + d23*da3d23*da3d23/(d23**2. - 1.) - da3d23a3) ),
+
+            # ad3 b3
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*db3d13/(d13**2. - 1.) - db3d13a3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*1.*sqrt( d23**2. - 1. ))*( (da3d23*db3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da3d23*0./1. + d23*da3d23*db3d23/(d23**2. - 1.) - db3d23a3) ),
+
+            # ad3 g3
+            -spring_arr[1][0]/(mass_arr[2]*1.*sqrt( d13**2. - 1. ))*( (da3d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(da3d13*0./1. + d13*da3d13*dg3d13/(d13**2. - 1.) - dg3d13a3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*1.*sqrt( d23**2. - 1. ))*( (da3d23*dg3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(da3d23*0./1. + d23*da3d23*dg3d23/(d23**2. - 1.) - dg3d23a3) ),
+            ],
+
+            # ---------- #
+
+            # bd3 a1,b1,g1
+            [-spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*da1d13/(d13**2. - 1.) - da1d13b3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*db1d13/(d13**2. - 1.) - db1d13b3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*dg1d13/(d13**2. - 1.) - dg1d13b3) ),
+
+            # bd3 a2,b2,g2
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d23**2. - 1. ))*( (db3d23*da2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db3d23*0./(cosh(a3)*cosh(a3)) + d23*db3d23*da2d23/(d23**2. - 1.) - da2d23b3) ),
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d23**2. - 1. ))*( (db3d23*db2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db3d23*0./(cosh(a3)*cosh(a3)) + d23*db3d23*db2d23/(d23**2. - 1.) - db2d23b3) ),
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d23**2. - 1. ))*( (db3d23*dg2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db3d23*0./(cosh(a3)*cosh(a3)) + d23*db3d23*dg2d23/(d23**2. - 1.) - dg2d23b3) ),
+
+            # bd3 a3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*sinh(2.*a3)/(cosh(a3)*cosh(a3)) + d13*db3d13*da3d13/(d13**2. - 1.) - da3d13b3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d23**2. - 1. ))*( (db3d23*da3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db3d23*sinh(2.*a3)/(cosh(a3)*cosh(a3)) + d23*db3d23*da3d23/(d23**2. - 1.) - da3d23b3) ),
+
+            # bd3 b3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*db3d13/(d13**2. - 1.) - db3d13b3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d23**2. - 1. ))*( (db3d23*db3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db3d23*0./(cosh(a3)*cosh(a3)) + d23*db3d23*db3d23/(d23**2. - 1.) - db3d23b3) ),
+
+            # bd3 g3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d13**2. - 1. ))*( (db3d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(db3d13*0./(cosh(a3)*cosh(a3)) + d13*db3d13*dg3d13/(d13**2. - 1.) - dg3d13b3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*sqrt( d23**2. - 1. ))*( (db3d23*dg3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(db3d23*0./(cosh(a3)*cosh(a3)) + d23*db3d23*dg3d23/(d23**2. - 1.) - dg3d23b3) ),
+            ],
+
+            # ---------- #
+
+            # gd3 a1,b1,g1
+            [-spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*da1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*da1d13/(d13**2. - 1.) - da1d13g3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*db1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*db1d13/(d13**2. - 1.) - db1d13g3) ),
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*dg1d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*dg1d13/(d13**2. - 1.) - dg1d13g3) ),
+
+            # gd3 a2,b2,g2
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d23**2. - 1. ))*( (dg3d23*da2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg3d23*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d23*dg3d23*da2d23/(d23**2. - 1.) - da2d23g3) ),
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d23**2. - 1. ))*( (dg3d23*db2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg3d23*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d23*dg3d23*db2d23/(d23**2. - 1.) - db2d23g3) ),
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d23**2. - 1. ))*( (dg3d23*dg2d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg3d23*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d23*dg3d23*dg2d23/(d23**2. - 1.) - dg2d23g3) ),
+
+            # gd3 a3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*da3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*sinh(2.*a3)*cosh(b3)*cosh(b3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*da3d13/(d13**2. - 1.) - da3d13g3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d23**2. - 1. ))*( (dg3d23*da3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg3d23*sinh(2.*a3)*cosh(b3)*cosh(b3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d23*dg3d23*da3d23/(d23**2. - 1.) - da3d23g3) ),
+
+            # gd3 b3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*db3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*sinh(2.*b3)*cosh(a3)*cosh(a3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*db3d13/(d13**2. - 1.) - db3d13g3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d23**2. - 1. ))*( (dg3d23*db3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg3d23*sinh(2.*b3)*cosh(a3)*cosh(a3)/(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d23*dg3d23*db3d23/(d23**2. - 1.) - db3d23g3) ),
+
+            # gd3 g3
+            -spring_arr[1][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d13**2. - 1. ))*( (dg3d13*dg3d13)/sqrt( d13**2. - 1.) - ( arccosh(d13) - spring_arr[1][1] )*(dg3d13*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d13*dg3d13*dg3d13/(d13**2. - 1.) - dg3d13g3) ) + 
+            -spring_arr[2][0]/(mass_arr[2]*cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)*sqrt( d23**2. - 1. ))*( (dg3d23*dg3d23)/sqrt( d23**2. - 1.) - ( arccosh(d23) - spring_arr[2][1] )*(dg3d23*0./(cosh(a3)*cosh(a3)*cosh(b3)*cosh(b3)) + d23*dg3d23*dg3d23/(d23**2. - 1.) - dg3d23g3) ),
+            ]
+
+        ])
+   
+    def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return an1 - an - .5*h*(adn + adn1)
+
+    def con2(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return bn1 - bn - .5*h*(bdn + bdn1)
+
+    def con3(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h): 
+        return gn1 - gn - .5*h*(gdn + gdn1)        
+
+    def con4(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, spoke2_pos, spoke2_pos_guess, base_vel, base_vel_guess, m1, h, sp12, sp13):
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        a3n,b3n,g3n=spoke2_pos
+        a3n1,b3n1,g3n1=spoke2_pos_guess
+        return (ad1n1 - ad1n - .5*h*(
+            (bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n) - 
+            sp12[0]/m1*( 
+            arccosh(cosh(a1n)*cosh(a2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n)) - sp12[1])*
+            (sinh(a1n)*cosh(a2n) - cosh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - cosh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n))/sqrt(-1. + 
+            (cosh(a1n)*cosh(a2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n))**2.) -
+            sp13[0]/m1*( 
+            arccosh(cosh(a1n)*cosh(a3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n)) - sp13[1])*
+            (sinh(a1n)*cosh(a3n) - cosh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - cosh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n))/sqrt(-1. + 
+            (cosh(a1n)*cosh(a3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n))**2.)
+            + 
+            (bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1) - 
+            sp12[0]/m1*( 
+            arccosh(cosh(a1n1)*cosh(a2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1)) - sp12[1])*
+            (sinh(a1n1)*cosh(a2n1) - cosh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - cosh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1))/sqrt(-1. + 
+            (cosh(a1n1)*cosh(a2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1))**2.) -
+            sp13[0]/m1*( 
+            arccosh(cosh(a1n1)*cosh(a3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1)) - sp13[1])*
+            (sinh(a1n1)*cosh(a3n1) - cosh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - cosh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1))/sqrt(-1. + 
+            (cosh(a1n1)*cosh(a3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1))**2.)
+            ))
+
+    def con5(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, spoke2_pos, spoke2_pos_guess, base_vel, base_vel_guess, m1, h, sp12, sp13):
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        a3n,b3n,g3n=spoke2_pos
+        a3n1,b3n1,g3n1=spoke2_pos_guess
+        return (bd1n1 - bd1n - .5*h*(
+            gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n) - 
+            sp12[0]/(m1*sinh(a1n)*sinh(a1n))*( 
+            arccosh(cosh(a1n)*cosh(a2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n)) - sp12[1])*
+            (sinh(a1n)*sin(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n))/sqrt(-1. + 
+            (cosh(a1n)*cosh(a2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n))**2.) -
+            sp13[0]/(m1*sinh(a1n)*sinh(a1n))*( 
+            arccosh(cosh(a1n)*cosh(a3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n)) - sp13[1])*
+            (sinh(a1n)*sin(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n))/sqrt(-1. + 
+            (cosh(a1n)*cosh(a3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n))**2.)
+            + 
+            gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1) - 
+            sp12[0]/(m1*sinh(a1n1)*sinh(a1n1))*( 
+            arccosh(cosh(a1n1)*cosh(a2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1)) - sp12[1])*
+            (sinh(a1n1)*sin(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1))/sqrt(-1. + 
+            (cosh(a1n1)*cosh(a2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1))**2.) -
+            sp13[0]/(m1*sinh(a1n1)*sinh(a1n1))*( 
+            arccosh(cosh(a1n1)*cosh(a3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1)) - sp13[1])*
+            (sinh(a1n1)*sin(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1))/sqrt(-1. + 
+            (cosh(a1n1)*cosh(a3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1))**2.)
+            ))
+
+    def con6(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, spoke2_pos, spoke2_pos_guess, base_vel, base_vel_guess, m1, h, sp12, sp13):
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        a3n,b3n,g3n=spoke2_pos
+        a3n1,b3n1,g3n1=spoke2_pos_guess
+
+        return (gd1n1 - gd1n - .5*h*(
+            -2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n) - 
+            sp12[0]/(m1*sinh(a1n)*sinh(a1n)*sin(b1n)*sin(b1n))*( 
+            arccosh(cosh(a1n)*cosh(a2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n)) - sp12[1])*
+            (sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*sin(g1n - g2n))/sqrt(-1. + 
+            (cosh(a1n)*cosh(a2n) - sinh(a1n)*cos(b1n)*sinh(a2n)*cos(b2n) - sinh(a1n)*sin(b1n)*sinh(a2n)*sin(b2n)*cos(g1n - g2n))**2.) -
+            sp13[0]/(m1*sinh(a1n)*sinh(a1n)*sin(b1n)*sin(b1n))*( 
+            arccosh(cosh(a1n)*cosh(a3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n)) - sp13[1])*
+            (sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*sin(g1n - g3n))/sqrt(-1. + 
+            (cosh(a1n)*cosh(a3n) - sinh(a1n)*cos(b1n)*sinh(a3n)*cos(b3n) - sinh(a1n)*sin(b1n)*sinh(a3n)*sin(b3n)*cos(g1n - g3n))**2.)
+            + 
+            -2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1) - 
+            sp12[0]/(m1*sinh(a1n1)*sinh(a1n1)*sin(b1n1)*sin(b1n1))*( 
+            arccosh(cosh(a1n1)*cosh(a2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1)) - sp12[1])*
+            (sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*sin(g1n1 - g2n1))/sqrt(-1. + 
+            (cosh(a1n1)*cosh(a2n1) - sinh(a1n1)*cos(b1n1)*sinh(a2n1)*cos(b2n1) - sinh(a1n1)*sin(b1n1)*sinh(a2n1)*sin(b2n1)*cos(g1n1 - g2n1))**2.) -
+            sp13[0]/(m1*sinh(a1n1)*sinh(a1n1)*sin(b1n1)*sin(b1n1))*( 
+            arccosh(cosh(a1n1)*cosh(a3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1)) - sp13[1])*
+            (sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*sin(g1n1 - g3n1))/sqrt(-1. + 
+            (cosh(a1n1)*cosh(a3n1) - sinh(a1n1)*cos(b1n1)*sinh(a3n1)*cos(b3n1) - sinh(a1n1)*sin(b1n1)*sinh(a3n1)*sin(b3n1)*cos(g1n1 - g3n1))**2.)
+            )) 
+    
+    def jacobian(positions, velocities, mass_arr, h, spring_arr):
+        a1n1,b1n1,g1n1=positions[0]
+        a2n1,b2n1,g2n1=positions[1]
+        a3n1,b3n1,g3n1=positions[2]
+        ad1n1,bd1n1,gd1n1=velocities[0]
+        ad2n1,bd2n1,gd2n1=velocities[1]
+        ad3n1,bd3n1,gd3n1=velocities[2]
+        spring_terms=jacobi_sp_terms(positions, mass_arr, spring_arr)
+        #print(spring_terms)
+        return array([
+            [1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0., 0.,0.,0.],
+            [0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0., 0.,0.,0.],
+            [0.,0.,1., 0.,0.,0., 0.,0.,0., 0.,0.,-.5*h, 0.,0.,0., 0.,0.,0.],
+
+            [0.,0.,0., 1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0.],
+            [0.,0.,0., 0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0.],
+            [0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,0., 0.,0.,-.5*h, 0.,0.,0.],
+
+            [0.,0.,0., 0.,0.,0., 1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0.],
+            [0.,0.,0., 0.,0.,0., 0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0.],
+            [0.,0.,0., 0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,0., 0.,0.,-.5*h],
+
+            # ad1 update
+            [-.5*h*(bd1n1*bd1n1+sin(b1n1)*sin(b1n1)*gd1n1*gd1n1)*cosh(2.*a1n1) + spring_terms[0][0],
+            .25*h*sinh(2.*a1n1)*sin(2.*b1n1)*gd1n1*gd1n1 + spring_terms[0][1],
+            0. + spring_terms[0][2], 
+            
+            spring_terms[0][3],
+            spring_terms[0][4],
+            spring_terms[0][5],
+
+            spring_terms[0][6],
+            spring_terms[0][7],
+            spring_terms[0][8],
+            
+            1.,
+            -.5*h*sinh(2.*a1n1)*bd1n1,
+            -.5*h*sinh(2.*a1n1)*sin(b1n1)*sin(b1n1)*gd1n1,
+
+            0.,0.,0., 0.,0.,0.
+            ],
+
+            # bd1 update
+            [-h*ad1n1*bd1n1/(sinh(a1n1)*sinh(a1n1)) + spring_terms[1][0],
+            -.5*h*cos(2.*b1n1)*gd1n1*gd1n1 + spring_terms[1][1],
+            0. + spring_terms[1][2], 
+            
+            spring_terms[1][3],
+            spring_terms[1][4],
+            spring_terms[1][5],
+
+            spring_terms[1][6],
+            spring_terms[1][7],
+            spring_terms[1][8],
+            
+            h/tanh(a1n1)*bd1n1,
+            1.+h/tanh(a1n1)*ad1n1,
+            -.5*h*sin(2.*b1n1)*gd1n1,
+
+            0.,0.,0., 0.,0.,0.
+            ],
+
+            # gd1 update
+            [-h*ad1n1*gd1n1/(sinh(a1n1)*sinh(a1n1)) + spring_terms[2][0],
+            -h*bd1n1*gd1n1/(sin(b1n1)*sin(b1n1)) + spring_terms[2][1],
+            0. + spring_terms[2][2],
+             
+            spring_terms[2][3],
+            spring_terms[2][4],
+            spring_terms[2][5],
+
+            spring_terms[2][6],
+            spring_terms[2][7],
+            spring_terms[2][8],
+
+            h/tanh(a1n1)*gd1n1,
+            h/tan(b1n1)*gd1n1,
+            1.+h/tanh(a1n1)*ad1n1+h/tan(b1n1)*bd1n1,
+
+            0.,0.,0., 0.,0.,0.
+            ],
+
+            # ad2 update
+            [spring_terms[3][0],
+            spring_terms[3][1],
+            spring_terms[3][2],
+
+            -.5*h*(bd2n1*bd2n1+sin(b2n1)*sin(b2n1)*gd2n1*gd2n1)*cosh(2.*a2n1) + spring_terms[3][3],
+            .25*h*sinh(2.*a2n1)*sin(2.*b2n1)*gd2n1*gd2n1 + spring_terms[3][4],
+            0. + spring_terms[3][5],
+
+            spring_terms[3][6],
+            spring_terms[3][7],
+            spring_terms[3][8],
+
+            0.,0.,0.,
+
+            1.,
+            -.5*h*sinh(2.*a2n1)*bd2n1,
+            -.5*h*sinh(2.*a2n1)*sin(b2n1)*sin(b2n1)*gd2n1,
+
+            0.,0.,0.
+            ],
+
+            # bd2 update
+            [spring_terms[4][0],
+            spring_terms[4][1],
+            spring_terms[4][2],
+
+            -h*ad2n1*bd2n1/(sinh(a2n1)*sinh(a2n1)) + spring_terms[4][3],
+            -.5*h*cos(2.*b2n1)*gd2n1*gd2n1 + spring_terms[4][4],
+            0. + spring_terms[4][5],
+
+            spring_terms[4][6],
+            spring_terms[4][7],
+            spring_terms[4][8],
+
+            0.,0.,0.,
+
+            h/tanh(a2n1)*bd2n1,
+            1.+h/tanh(a2n1)*ad2n1,
+            -.5*h*sin(2.*b2n1)*gd2n1,
+            
+            0.,0.,0.
+            ],
+
+            # gd2 update
+            [spring_terms[5][0],
+            spring_terms[5][1],
+            spring_terms[5][2],
+
+            -h*ad2n1*gd2n1/(sinh(a2n1)*sinh(a2n1)) + spring_terms[5][3],
+            -h*bd2n1*gd2n1/(sin(b2n1)*sin(b2n1)) + spring_terms[5][4],
+            0. + spring_terms[5][5],
+
+            spring_terms[5][6],
+            spring_terms[5][7],
+            spring_terms[5][8],
+
+            0.,0.,0.,
+
+            h/tanh(a2n1)*gd2n1,
+            h/tan(b2n1)*gd2n1,
+            1.+h/tanh(a2n1)*ad2n1+h/tan(b2n1)*bd2n1,
+            
+            0.,0.,0.
+            ],
+
+            # ad3 update
+            [spring_terms[6][0],
+            spring_terms[6][1],
+            spring_terms[6][2],
+
+            spring_terms[6][3],
+            spring_terms[6][4],
+            spring_terms[6][5],
+
+            -.5*h*(bd3n1*bd3n1+sin(b3n1)*sin(b3n1)*gd3n1*gd3n1)*cosh(2.*a3n1) + spring_terms[6][6],
+            .25*h*sinh(2.*a3n1)*sin(2.*b3n1)*gd3n1*gd3n1 + spring_terms[6][7],
+            0. + spring_terms[6][8],
+
+            0.,0.,0., 0.,0.,0.,
+
+            1.,
+            -.5*h*sinh(2.*a3n1)*bd3n1,
+            -.5*h*sinh(2.*a3n1)*sin(b3n1)*sin(b3n1)*gd3n1
+            ],
+
+            # bd3 update
+            [spring_terms[7][0],
+            spring_terms[7][1],
+            spring_terms[7][2],
+
+            spring_terms[7][3],
+            spring_terms[7][4],
+            spring_terms[7][5],
+
+            -h*ad3n1*bd3n1/(sinh(a3n1)*sinh(a3n1)) + spring_terms[7][6],
+            -.5*h*cos(2.*b3n1)*gd3n1*gd3n1 + spring_terms[7][7],
+            0. + spring_terms[7][8],
+
+            0.,0.,0., 0.,0.,0.,
+
+            h/tanh(a3n1)*bd3n1,
+            1.+h/tanh(a3n1)*ad3n1,
+            -.5*h*sin(2.*b3n1)*gd3n1
+            ],
+
+            # gd3 update
+            [spring_terms[8][0],
+            spring_terms[8][1],
+            spring_terms[8][2],
+
+            spring_terms[8][3],
+            spring_terms[8][4],
+            spring_terms[8][5],
+
+            -h*ad3n1*gd3n1/(sinh(a3n1)*sinh(a3n1)) + spring_terms[8][6],
+            -h*bd3n1*gd3n1/(sin(b3n1)*sin(b3n1)) + spring_terms[8][7],
+            0. + spring_terms[8][8],
+
+            0.,0.,0., 0.,0.,0.,
+
+            h/tanh(a3n1)*gd3n1,
+            h/tan(b3n1)*gd3n1,
+            1.+h/tanh(a3n1)*ad3n1+h/tan(b3n1)*bd3n1
+            ]
+        ])
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    diff1=linalg.solve(jacobian(posn_arr, veln_arr, mass_arr, step, spring_arr),-array([
+        #p1
+        con1(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con2(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con3(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        #p2
+        con1(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con2(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con3(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        #p3
+        con1(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+        con2(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+        con3(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+
+        #v1
+        con4(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        con5(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        con6(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        #v2
+        con4(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        con5(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        con6(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        #v3
+        con4(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+        con5(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+        con6(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2])      
+    ]))
+    val1 = array([
+            posn_arr[0][0]+diff1[0], posn_arr[0][1]+diff1[1], posn_arr[0][2]+diff1[2], 
+            posn_arr[1][0]+diff1[3], posn_arr[1][1]+diff1[4], posn_arr[1][2]+diff1[5],
+            posn_arr[2][0]+diff1[6], posn_arr[2][1]+diff1[7], posn_arr[2][2]+diff1[8],
+
+            veln_arr[0][0]+diff1[9], veln_arr[0][1]+diff1[10], veln_arr[0][2]+diff1[11], 
+            veln_arr[1][0]+diff1[12], veln_arr[1][1]+diff1[13], veln_arr[1][2]+diff1[14],
+            veln_arr[2][0]+diff1[15], veln_arr[2][1]+diff1[16], veln_arr[2][2]+diff1[17]
+            ])    
+    x = 0
+    while(x < 7):
+        new_pos_arr=array([val1[0:3],val1[3:6],val1[6:9]])
+        new_vel_arr=array([val1[9:12],val1[12:15],val1[15:18]])
+        diff2=linalg.solve(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr),-array([
+            #p1
+            con1(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con2(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con3(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            #p2
+            con1(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con2(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con3(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            #p3
+            con1(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+            con2(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+            con3(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+
+            #v1
+            con4(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            con5(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            con6(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            #v2
+            con4(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con5(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con6(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            #v3
+            con4(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con5(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con6(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2])    
+        ]))      
+        val2 = array([
+            val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], 
+            val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5],
+            val1[6]+diff2[6], val1[7]+diff2[7], val1[8]+diff2[8],
+
+            val1[9]+diff2[9], val1[10]+diff2[10], val1[11]+diff2[11], 
+            val1[12]+diff2[12], val1[13]+diff2[13], val1[14]+diff2[14],
+            val1[15]+diff2[15], val1[16]+diff2[16], val1[17]+diff2[17]
+            ])
+        val1 = val2
+        x=x+1
+    #print(val1[9:17])
+    return val1
+
+
 #################################################
 ### H2xE 3-space Spring Potential (Dumb-Bell) ###
 #################################################
