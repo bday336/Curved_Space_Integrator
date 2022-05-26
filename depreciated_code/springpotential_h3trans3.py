@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot3
+from symint_bank import imph3sptrans3
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convert_rot2transh3
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -7,7 +7,11 @@ from matplotlib import animation, rc
 import numpy as np
 from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
-#Initial position (position / velocity in rotational parameterization)
+######################################################################################
+# BROKEN SCRIPT DUE TO COORDINATE SYSTEM DO NOT USE. USE ROTATIONAL PARAMETERIZATION #
+######################################################################################
+
+#Initial position (position in rotational / velocity in chosen parameterization)
 #The initial conditions are given as an array of the data for each of the particles being
 # initialized. Each element is a particle with each element having 8 components
 # { ai , bi , gi , adi , bdi , gdi , mass , radius }
@@ -15,9 +19,9 @@ from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arcc
 #Initialize the particles in the simulation
 #Edge on triangle
 particles=array([
-    [.5,np.pi/2.,0.*2.*np.pi/3.,.0,-.25,.0,1.,.2],               #particle 1
-    [.5,np.pi/2.,1.*2.*np.pi/3.,.0,-.25,.0,1.,.2],           #particle 2
-    [.5,np.pi/2.,2.*2.*np.pi/3.,0.,-.25,.0,1.,.2]         #particle 2
+    [.5,np.pi/2.,0.*np.pi,.0,.0,.25,1.,.2],               #particle 1
+    [.0,np.pi/2.,0.,.0,.0,.25,1.,.2],           #particle 2
+    [.5,np.pi/2.,np.pi,0.,.0,.25,1.,.2]         #particle 2
     ])
 
 # # Face on triangle
@@ -47,9 +51,9 @@ maxT=10+delT
 
 # Position in translational parameterization
 positions = array([
-    particles[0][:3],
-    particles[1][:3],
-    particles[2][:3]])
+    convert_rot2transh3(particles[0][:3]),
+    convert_rot2transh3(particles[1][:3]),
+    convert_rot2transh3(particles[2][:3])])
 # Velocity given in translational parameterization
 velocities = array([
     particles[0][3:6],
@@ -74,13 +78,13 @@ gbt=append(gbt, array([positions[0][1],positions[1][1],positions[2][1]]))
 ggt=append(ggt, array([positions[0][2],positions[1][2],positions[2][2]]))
 
 # Distance between masses
-dist12=append(dist12,h3dist([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
-dist13=append(dist13,h3dist([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
-dist23=append(dist23,h3dist([sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+dist12=append(dist12,h3dist([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])],[sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]))
+dist13=append(dist13,h3dist([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+dist23=append(dist23,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
 
 # Numerical Integration step
 step_data=array([
-	imph3sprot3(positions, velocities, delT, array([1.,1.,1.]), spring_arr)
+	imph3sptrans3(positions, velocities, delT, array([1.,1.,1.]), spring_arr)
 	])
 
 # Include the first time step
@@ -89,9 +93,9 @@ gbt=append(gbt, array([step_data[0][1],step_data[0][4],step_data[0][7]]))
 ggt=append(ggt, array([step_data[0][2],step_data[0][5],step_data[0][8]]))
 
 # Distance between masses
-dist12=append(dist12,h3dist([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
-dist13=append(dist13,h3dist([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
-dist23=append(dist23,h3dist([sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+dist12=append(dist12,h3dist([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])],[sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]))
+dist13=append(dist13,h3dist([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+dist23=append(dist23,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
 
 q=q+1
 
@@ -108,7 +112,7 @@ while(q < nump-1):
         nextdot = array([step_data[0][9:12], step_data[0][12:15], step_data[0][15:]])
 
     step_data=array([
-        imph3sprot3(nextpos, nextdot, delT, array([1.,1.,1.]), spring_arr)
+        imph3sptrans3(nextpos, nextdot, delT, array([1.,1.,1.]), spring_arr)
         ])
 
     gat=append(gat, array([step_data[0][0],step_data[0][3],step_data[0][6]]))
@@ -116,9 +120,9 @@ while(q < nump-1):
     ggt=append(ggt, array([step_data[0][2],step_data[0][5],step_data[0][8]]))
 
     # Distance between masses
-    dist12=append(dist12,h3dist([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
-    dist13=append(dist13,h3dist([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
-    dist23=append(dist23,h3dist([sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+    dist12=append(dist12,h3dist([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])],[sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]))
+    dist13=append(dist13,h3dist([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
+    dist23=append(dist23,h3dist([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])],[sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]))
 
     q=q+1
 
@@ -130,9 +134,9 @@ grt=[]
 
 
 for b in range(len(gat)):
-    gut=append(gut,sinh(gat[b])*sin(gbt[b])*sin(ggt[b])/(cosh(gat[b]) + 1.))
-    gvt=append(gvt,sinh(gat[b])*sin(gbt[b])*cos(ggt[b])/(cosh(gat[b]) + 1.))
-    grt=append(grt,sinh(gat[b])*cos(gbt[b])/(cosh(gat[b]) + 1.))	    	     		
+    gut=append(gut,sinh(gat[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
+    gvt=append(gvt,cosh(gat[b])*sinh(gbt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))
+    grt=append(grt,cosh(gat[b])*cosh(gbt[b])*sinh(ggt[b])/(cosh(gat[b])*cosh(gbt[b])*cosh(ggt[b]) + 1.))	    	     		
 
 #####################
 #  PLOTTING SECTION #
@@ -198,9 +202,9 @@ ax1.set_ylabel('Y')
 ax1.set_zlim3d(-1,1)
 ax1.set_zlabel('Z')
 
-part1x,part1y,part1z=hypercirch3(array([sinh(gat[-3]*sin(gbt[-3])*cos(ggt[-3])),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])]),particles[0][7])
-part2x,part2y,part2z=hypercirch3(array([sinh(gat[-2]*sin(gbt[-2])*cos(ggt[-2])),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]),particles[1][7])
-part3x,part3y,part3z=hypercirch3(array([sinh(gat[-1]*sin(gbt[-1])*cos(ggt[-1])),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]),particles[2][7])
+part1x,part1y,part1z=hypercirch3(array([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])]),particles[0][7])
+part2x,part2y,part2z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[1][7])
+part3x,part3y,part3z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[2][7])
 
 #draw trajectory
 ax1.plot3D(gut[0::3],gvt[0::3],grt[0::3], label="particle 1")
