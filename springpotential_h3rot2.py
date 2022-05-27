@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot3
+from symint_bank import imph3sprot2
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convert_rot2transh3
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -12,19 +12,17 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 # initialized. Each element is a particle with each element having 8 components
 # { ai , bi , gi , adi , bdi , gdi , mass , radius }
 
-#Initialize the particles in the simulation
-#Face on triangle
+# Initialize the particles in the simulation
+# Parallel Initial Velocities
 # particles=array([
-#     [.5,np.pi/2.,0.*2.*np.pi/3.,.0,-.5,.0,1.,.2],        #particle 1
-#     [.5,np.pi/2.,1.*2.*np.pi/3.,.0,-.5,.0,1.,.2],        #particle 2
-#     [.5,np.pi/2.,2.*2.*np.pi/3.,0.,-.5,.0,1.,.2]         #particle 3
+#     [.5,np.pi/2.,0.*np.pi,.0,-.5,.0,1.,.2],        #particle 1
+#     [.5,np.pi/2.,1.*np.pi,.0,-.5,.0,1.,.2]        #particle 2
 #     ])
 
-# # Face on triangle (normalize the initial velocity in minkowski metric to have .5 as magnitude)
+# Anti-Parallel Initial Velocities
 particles=array([
-    [.5,np.pi/2.,0.*2.*np.pi/3.,.5,0.,.0,1.,.2],        #particle 1
-    [.5,np.pi/2.,1.*2.*np.pi/3.,(.5*tanh(.5)/tan(1.*2.*np.pi/3.))/sqrt(tanh(.5)*tanh(.5)/tan(1.*2.*np.pi/3.)/tan(1.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),0.,-(.5)/sqrt(tanh(.5)*tanh(.5)/tan(1.*2.*np.pi/3.)/tan(1.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),1.,.2],        #particle 2
-    [.5,np.pi/2.,2.*2.*np.pi/3.,-(.5*tanh(.5)/tan(2.*2.*np.pi/3.))/sqrt(tanh(.5)*tanh(.5)/tan(2.*2.*np.pi/3.)/tan(2.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),0.,(.5)/sqrt(tanh(.5)*tanh(.5)/tan(2.*2.*np.pi/3.)/tan(2.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),1.,.2]         #particle 3
+    [.5,np.pi/2.,0.*np.pi,.0,-1.5,.0,1.,.2],        #particle 1
+    [.5,np.pi/2.,1.*np.pi,.0,1.5,.0,1.,.2]        #particle 2
     ])
 
 # Initialize the parameters of what I will consider the
@@ -34,9 +32,7 @@ particles=array([
 # { spring constant (k) , equilibrium length of spring (l_{eq}) }
 # The value for equilibrium length was calculated on mathematica
 spring_arr=array([
-    [1.,0.874436528313447],    #spring 12
-    [1.,0.874436528313447],    #spring 13
-    [1.,0.874436528313447],    #spring 23
+    [1.,0.874436528313447]    #spring 12
     ])
 
 #Intialize the time stepping for the integrator.
@@ -48,13 +44,11 @@ maxT=10+delT
 # Position in translational parameterization
 positions = array([
     particles[0][:3],
-    particles[1][:3],
-    particles[2][:3]])
+    particles[1][:3]])
 # Velocity given in translational parameterization
 velocities = array([
     particles[0][3:6],
-    particles[1][3:6],
-    particles[2][3:6]])
+    particles[1][3:6]])
 
 nump=maxT/delT
 timearr=np.arange(0,maxT,delT)
@@ -65,33 +59,27 @@ gat = []
 gbt = []
 ggt = []
 dist12 = []
-dist13 = []
-dist23 = []
 
 # Include the intial data
-gat=append(gat, array([positions[0][0],positions[1][0],positions[2][0]]))
-gbt=append(gbt, array([positions[0][1],positions[1][1],positions[2][1]]))
-ggt=append(ggt, array([positions[0][2],positions[1][2],positions[2][2]]))
+gat=append(gat, array([positions[0][0],positions[1][0]]))
+gbt=append(gbt, array([positions[0][1],positions[1][1]]))
+ggt=append(ggt, array([positions[0][2],positions[1][2]]))
 
 # Distance between masses
-dist12=append(dist12,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
-dist13=append(dist13,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
-dist23=append(dist23,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
 # Numerical Integration step
 step_data=array([
-	imph3sprot3(positions, velocities, delT, array([1.,1.,1.]), spring_arr)
+	imph3sprot2(positions, velocities, delT, array([1.,1.]), spring_arr)
 	])
 
 # Include the first time step
-gat=append(gat, array([step_data[0][0],step_data[0][3],step_data[0][6]]))
-gbt=append(gbt, array([step_data[0][1],step_data[0][4],step_data[0][7]]))
-ggt=append(ggt, array([step_data[0][2],step_data[0][5],step_data[0][8]]))
+gat=append(gat, array([step_data[0][0],step_data[0][3]]))
+gbt=append(gbt, array([step_data[0][1],step_data[0][4]]))
+ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
 
 # Distance between masses
-dist12=append(dist12,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
-dist13=append(dist13,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
-dist23=append(dist23,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
 q=q+1
 
@@ -104,21 +92,19 @@ while(q < nump-1):
         nextpos = array([step_data[0][:3], step_data[1][:3]])
         nextdot= collisionh3(step_data[0][:3], step_data[1][:3],step_data[0][3:6], step_data[1][3:6],particles[0][6],particles[1][6],dist)
     else:
-        nextpos = array([step_data[0][0:3], step_data[0][3:6], step_data[0][6:9]])
-        nextdot = array([step_data[0][9:12], step_data[0][12:15], step_data[0][15:]])
+        nextpos = array([step_data[0][0:3], step_data[0][3:6]])
+        nextdot = array([step_data[0][6:9], step_data[0][9:]])
 
     step_data=array([
-        imph3sprot3(nextpos, nextdot, delT, array([1.,1.,1.]), spring_arr)
+        imph3sprot2(nextpos, nextdot, delT, array([1.,1.]), spring_arr)
         ])
 
-    gat=append(gat, array([step_data[0][0],step_data[0][3],step_data[0][6]]))
-    gbt=append(gbt, array([step_data[0][1],step_data[0][4],step_data[0][7]]))
-    ggt=append(ggt, array([step_data[0][2],step_data[0][5],step_data[0][8]]))
+    gat=append(gat, array([step_data[0][0],step_data[0][3]]))
+    gbt=append(gbt, array([step_data[0][1],step_data[0][4]]))
+    ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
 
     # Distance between masses
-    dist12=append(dist12,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
-    dist13=append(dist13,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
-    dist23=append(dist23,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+    dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
     q=q+1
 
@@ -198,26 +184,21 @@ ax1.set_ylabel('Y')
 ax1.set_zlim3d(-1,1)
 ax1.set_zlabel('Z')
 
-part1x,part1y,part1z=hypercirch3(array([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])]),particles[0][7])
-part2x,part2y,part2z=hypercirch3(array([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]),particles[1][7])
-part3x,part3y,part3z=hypercirch3(array([sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]),particles[2][7])
+part1x,part1y,part1z=hypercirch3(array([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]),particles[0][7])
+part2x,part2y,part2z=hypercirch3(array([sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]),particles[1][7])
 
 #draw trajectory
-ax1.plot3D(gut[0::3],gvt[0::3],grt[0::3], label="particle 1", color="b")
-ax1.plot3D(gut[1::3],gvt[1::3],grt[1::3], label="particle 2", color="r")
-ax1.plot3D(gut[2::3],gvt[2::3],grt[2::3], label="particle 3", color="k")
+ax1.plot3D(gut[0::2],gvt[0::2],grt[0::2], label="particle 1", color="b")
+ax1.plot3D(gut[1::2],gvt[1::2],grt[1::2], label="particle 2", color="r")
 ax1.legend(loc= 'lower left')
 
 ax1.plot_surface(part1x, part1y, part1z, color="b")
 ax1.plot_surface(part2x, part2y, part2z, color="r")
-ax1.plot_surface(part3x, part3y, part3z, color="k")
 
 # Displacement Plot
 ax2=fig.add_subplot(1,3,2)
 
 ax2.plot(timearr,(dist12-spring_arr[0][1]),label="Spring 12 Displacement")
-ax2.plot(timearr,(dist13-spring_arr[1][1]),label="Spring 13 Displacement")
-ax2.plot(timearr,(dist23-spring_arr[2][1]),label="Spring 23 Displacement")
 #ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
 #ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
 #ax2.set_yscale("log",basey=10)	
@@ -229,8 +210,6 @@ ax2.legend(loc='lower right')
 ax3=fig.add_subplot(1,3,3)
 
 ax3.plot(timearr,(dist12-spring_arr[0][1])*spring_arr[0][0],label="Spring 12 Force")
-ax3.plot(timearr,(dist13-spring_arr[1][1])*spring_arr[1][0],label="Spring 13 Force")
-ax3.plot(timearr,(dist23-spring_arr[2][1])*spring_arr[2][0],label="Spring 23 Force")
 # ax3.set_yscale("log",basey=10)
 ax3.set_xlabel('time (s)')	
 ax3.legend(loc='lower right')	
