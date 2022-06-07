@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append
+from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arccos,arctan2,matmul,exp,identity,append
 
 #########
 
@@ -47,6 +47,16 @@ def convertpos_hyp2paratransh2(hyp_vec):
 def convertvel_hyp2paratransh2(hyp_pos,hyp_vel):
    parapos=convertpos_hyp2paratransh2(hyp_pos)
    return array([hyp_vel[0]/cosh(parapos[0]), (hyp_vel[1]*cosh(parapos[1])-hyp_vel[2]*sinh(parapos[1]))/cosh(parapos[0])])
+
+# Convert from rotational parameterization to hyperboloid model (H3 position)
+
+def convertpos_rot2hyph3(rot_vec):
+   return array([sinh(rot_vec[0])*sin(rot_vec[1])*cos(rot_vec[2]),sinh(rot_vec[0])*sin(rot_vec[1])*sin(rot_vec[2]),sinh(rot_vec[0])*cos(rot_vec[1]),cosh(rot_vec[0])])
+
+# Convert from hyperboloid model to rotational parameterization (H3 position)
+
+def convertpos_hyp2roth3(hyp_vec):
+   return array([arccosh(hyp_vec[3]),arccos(hyp_vec[2]/sinh(arccosh(hyp_vec[3]))),arctan2(hyp_vec[1],hyp_vec[0])])
 
 
 # Distance functions
