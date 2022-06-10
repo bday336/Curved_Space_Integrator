@@ -1,5 +1,5 @@
 from symint_bank import imph3sprot4
-from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3
+from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -7,44 +7,47 @@ from matplotlib import animation, rc
 import numpy as np
 from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
-#Initial position (position / velocity in rotational parameterization)
-#The initial conditions are given as an array of the data for each of the particles being
+# Initial position (position / velocity in rotational parameterization)
+# The initial conditions are given as an array of the data for each of the particles being
 # initialized. Each element is a particle with each element having 8 components
+# The initial positions are given by the coordinates in the rotational parameterization
+# and the initial velocities are given through using a killing field of generic loxodromic
+# geodesic flow along the x-axis.
 # { ai , bi , gi , adi , bdi , gdi , mass , radius }
 
 # Initialize the particles in the simulation
-# Check Equilibrium (verified to 10^-13)
+# Check Equilibrium (verified to 10^-15)
 # particles=array([
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),[0.,0.,.0,1.,.2])),        #particle 1
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),[0.,0.,.0,1.,.2])),        #particle 2
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),[0.,0.,.0,1.,.2])),        #particle 3
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),[0.,0.,.0,1.,.2]))         #particle 4
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),.0,.0),[1.,.2])),        #particle 1
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),.0,.0),[1.,.2])),        #particle 2
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),.0,.0),[1.,.2])),        #particle 3
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),.0,.0),[1.,.2]))         #particle 4
 #     ])
-  
 
-# Breathe Test 
+# Vertex on flow axis
 particles=array([
-    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),[.0,.0,.5,1.,.2])),        #particle 1
-    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),[.0,.0,.0,1.,.2])),        #particle 2
-    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),[.0,.0,.0,1.,.2])),        #particle 3
-    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),[.0,.0,.0,1.,.2]))         #particle 4
+    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),.5,.0),[1.,.2])),        #particle 1
+    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),.5,.0),[1.,.2])),        #particle 2
+    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),.5,.0),[1.,.2])),        #particle 3
+    np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),.5,.0),[1.,.2]))         #particle 4
     ])
 
-
-# Vertex on triangle (Talk to Sabetta)
+# Edge on flow axis
 # particles=array([
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),[.5,0.,.0,1.,.2])),        #particle 1
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),[0.,-.5/sinh(.5),.0,1.,.2])),        #particle 2
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),[0.,0.,.0,1.,.2])),        #particle 3
-#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),[0.,0.,.0,1.,.2]))         #particle 4
+#     np.concatenate((convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),.5,.0),[1.,.2])),        #particle 1
+#     np.concatenate((convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),.5,.0),[1.,.2])),        #particle 2
+#     np.concatenate((convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),.5,.0),[1.,.2])),        #particle 3
+#     np.concatenate((convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotzh3(-np.arccos(-1./3.)/2.) @ rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),.5,.0),[1.,.2]))         #particle 4
 #     ])
 
-# Edge on triangle (normalize the initial velocity in minkowski metric to have .5 as magnitude)
+# Face on (normal to) flow axis
 # particles=array([
-#     [.5,np.pi/2.,0.*2.*np.pi/3.,.5,0.,.0,1.,.2],        #particle 1
-#     [.5,np.pi/2.,1.*2.*np.pi/3.,(.5*tanh(.5)/tan(1.*2.*np.pi/3.))/sqrt(tanh(.5)*tanh(.5)/tan(1.*2.*np.pi/3.)/tan(1.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),0.,-(.5)/sqrt(tanh(.5)*tanh(.5)/tan(1.*2.*np.pi/3.)/tan(1.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),1.,.2],        #particle 2
-#     [.5,np.pi/2.,2.*2.*np.pi/3.,-(.5*tanh(.5)/tan(2.*2.*np.pi/3.))/sqrt(tanh(.5)*tanh(.5)/tan(2.*2.*np.pi/3.)/tan(2.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),0.,(.5)/sqrt(tanh(.5)*tanh(.5)/tan(2.*2.*np.pi/3.)/tan(2.*2.*np.pi/3.)+sinh(.5)*sinh(.5)),1.,.2]         #particle 3
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,0.*np.arccos(-1./3.),0.*2.*np.pi/3.])),-.5,.0),[1.,.2])),        #particle 1
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),0.*2.*np.pi/3.])),-.5,.0),[1.,.2])),        #particle 2
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),1.*2.*np.pi/3.])),-.5,.0),[1.,.2])),        #particle 3
+#     np.concatenate((convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),initial_con(convertpos_hyp2roth3(rotxh3(np.pi/2.) @ rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,1.*np.arccos(-1./3.),2.*2.*np.pi/3.])),-.5,.0),[1.,.2]))         #particle 4
 #     ])
+
 
 # Initialize the parameters of what I will consider the
 # sping system. This can be expanded on in the future with
@@ -62,27 +65,31 @@ spring_arr=array([
     ])
 
 
-#Intialize the time stepping for the integrator.
+# Intialize the time stepping for the integrator.
 delT=.01
 maxT=10+delT
+nump=maxT/delT
+timearr=np.arange(0,maxT,delT)
 
-# Geodesic Trajectories
-
-# Position in translational parameterization
+# Positions in rotational parameterization
 positions = array([
     particles[0][:3],
     particles[1][:3],
     particles[2][:3],
     particles[3][:3]])
-# Velocity given in translational parameterization
+# Velocities in rotational parameterization
 velocities = array([
     particles[0][3:6],
     particles[1][3:6],
     particles[2][3:6],
     particles[3][3:6]])
+# Masses for each particle
+masses = array([
+    particles[0][6],
+    particles[1][6],
+    particles[2][6],
+    particles[3][6]])
 
-nump=maxT/delT
-timearr=np.arange(0,maxT,delT)
 
 # Containers for trajectory data
 q = 0
@@ -111,7 +118,7 @@ dist34=append(dist34,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2
 
 # Numerical Integration step
 step_data=array([
-	imph3sprot4(positions, velocities, delT, array([1.,1.,1.,1.]), spring_arr)
+	imph3sprot4(positions, velocities, delT, masses, spring_arr)
 	])
 
 # Include the first time step
@@ -142,7 +149,7 @@ while(q < nump-1):
         nextdot = array([step_data[0][12:15], step_data[0][15:18], step_data[0][18:21], step_data[0][21:]])
 
     step_data=array([
-        imph3sprot4(nextpos, nextdot, delT, array([1.,1.,1.,1.]), spring_arr)
+        imph3sprot4(nextpos, nextdot, delT, masses, spring_arr)
         ])
 
     gat=append(gat, array([step_data[0][0],step_data[0][3],step_data[0][6],step_data[0][9]]))
@@ -197,19 +204,22 @@ for b in range(len(gat)):
 # ax1.set_zlim3d(-1,1)
 # ax1.set_zlabel('Z')
 
-# part1x,part1y,part1z=hypercirch3(array([sinh(gat[-3]),cosh(gat[-3])*sinh(gbt[-3]),cosh(gat[-3])*cosh(gbt[-3])*sinh(ggt[-3]),cosh(gat[-3])*cosh(gbt[-3])*cosh(ggt[-3])]),particles[0][7])
-# part2x,part2y,part2z=hypercirch3(array([sinh(gat[-2]),cosh(gat[-2])*sinh(gbt[-2]),cosh(gat[-2])*cosh(gbt[-2])*sinh(ggt[-2]),cosh(gat[-2])*cosh(gbt[-2])*cosh(ggt[-2])]),particles[1][7])
-# part3x,part3y,part3z=hypercirch3(array([sinh(gat[-1]),cosh(gat[-1])*sinh(gbt[-1]),cosh(gat[-1])*cosh(gbt[-1])*sinh(ggt[-1]),cosh(gat[-1])*cosh(gbt[-1])*cosh(ggt[-1])]),particles[2][7])
+# part1x,part1y,part1z=hypercirch3(array([sinh(gat[-4])*sin(gbt[-4])*cos(ggt[-4]),sinh(gat[-4])*sin(gbt[-4])*sin(ggt[-4]),sinh(gat[-4])*cos(gbt[-4]),cosh(gat[-4])]),particles[0][7])
+# part2x,part2y,part2z=hypercirch3(array([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])]),particles[1][7])
+# part3x,part3y,part3z=hypercirch3(array([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]),particles[2][7])
+# part4x,part4y,part4z=hypercirch3(array([sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]),particles[3][7])
 
 # #draw trajectory
-# ax1.plot3D(gut[0::3],gvt[0::3],grt[0::3], label="particle 1")
-# ax1.plot3D(gut[1::3],gvt[1::3],grt[1::3], label="particle 2")
-# ax1.plot3D(gut[2::3],gvt[2::3],grt[2::3], label="particle 3")
+# ax1.plot3D(gut[0::4],gvt[0::4],grt[0::4], label="particle 1", color="b")
+# ax1.plot3D(gut[1::4],gvt[1::4],grt[1::4], label="particle 2", color="r")
+# ax1.plot3D(gut[2::4],gvt[2::4],grt[2::4], label="particle 3", color="k")
+# ax1.plot3D(gut[3::4],gvt[3::4],grt[3::4], label="particle 4", color="g")
 # ax1.legend(loc= 'lower left')
 
 # ax1.plot_surface(part1x, part1y, part1z, color="b")
-# ax1.plot_surface(part2x, part2y, part2z, color="b")
-# ax1.plot_surface(part3x, part3y, part3z, color="b")
+# ax1.plot_surface(part2x, part2y, part2z, color="r")
+# ax1.plot_surface(part3x, part3y, part3z, color="k")
+# ax1.plot_surface(part4x, part4y, part4z, color="g")
 
 # plt.show()
 
@@ -300,6 +310,9 @@ plt.show()
 # x3 = []
 # y3 = []
 # z3 = []
+# x4 = []
+# y4 = []
+# z4 = []
 
 # # First set up the figure, the axis, and the plot element we want to animate
 # fig = plt.figure(figsize=(8,8))
@@ -319,28 +332,34 @@ plt.show()
 # ax1.set_zlim3d(-1,1)
 # ax1.set_zlabel('Z')
 
-# part1x,part1y,part1z=hypercirch3(array([sinh(gat[0::3][0]),cosh(gat[0::3][0])*sinh(gbt[0::3][0]),cosh(gat[0::3][0])*cosh(gbt[0::3][0])*sinh(ggt[0::3][0]),cosh(gat[0::3][0])*cosh(gbt[0::3][0])*cosh(ggt[0::3][0])]),particles[0][7])
-# part2x,part2y,part2z=hypercirch3(array([sinh(gat[1::3][1]),cosh(gat[1::3][1])*sinh(gbt[1::3][1]),cosh(gat[1::3][1])*cosh(gbt[1::3][1])*sinh(ggt[1::3][1]),cosh(gat[1::3][1])*cosh(gbt[1::3][1])*cosh(ggt[1::3][1])]),particles[1][7])
-# part3x,part3y,part3z=hypercirch3(array([sinh(gat[2::3][2]),cosh(gat[2::3][2])*sinh(gbt[2::3][2]),cosh(gat[2::3][2])*cosh(gbt[2::3][2])*sinh(ggt[2::3][2]),cosh(gat[2::3][2])*cosh(gbt[2::3][2])*cosh(ggt[2::3][2])]),particles[2][7])
+# part1x,part1y,part1z=hypercirch3(array([sinh(gat[0::4][0])*sin(gbt[0::4][0])*cos(ggt[0::4][0]),sinh(gat[0::4][0])*sin(gbt[0::4][0])*sin(ggt[0::4][0]),sinh(gat[0::4][0])*cos(gbt[0::4][0]),cosh(gat[0::4][0])]),particles[0][7])
+# part2x,part2y,part2z=hypercirch3(array([sinh(gat[1::4][1])*sin(gbt[1::4][1])*cos(ggt[1::4][1]),sinh(gat[1::4][1])*sin(gbt[1::4][1])*sin(ggt[1::4][1]),sinh(gat[1::4][1])*cos(gbt[1::4][1]),cosh(gat[1::4][1])]),particles[1][7])
+# part3x,part3y,part3z=hypercirch3(array([sinh(gat[2::4][2])*sin(gbt[2::4][2])*cos(ggt[2::4][2]),sinh(gat[2::4][2])*sin(gbt[2::4][2])*sin(ggt[2::4][2]),sinh(gat[2::4][2])*cos(gbt[2::4][2]),cosh(gat[2::4][2])]),particles[2][7])
+# part4x,part4y,part4z=hypercirch3(array([sinh(gat[3::4][3])*sin(gbt[3::4][3])*cos(ggt[3::4][3]),sinh(gat[3::4][3])*sin(gbt[3::4][3])*sin(ggt[3::4][3]),sinh(gat[3::4][3])*cos(gbt[3::4][3]),cosh(gat[3::4][3])]),particles[3][7])
 # ball1=[ax1.plot_surface(part1x,part1y,part1z, color="b")]
-# ball2=[ax1.plot_surface(part2x,part2y,part2z, color="b")]
-# ball3=[ax1.plot_surface(part3x,part3y,part3z, color="b")]
+# ball2=[ax1.plot_surface(part2x,part2y,part2z, color="r")]
+# ball3=[ax1.plot_surface(part3x,part3y,part3z, color="k")]
+# ball4=[ax1.plot_surface(part4x,part4y,part4z, color="g")]
 
 # # animation function. This is called sequentially
 # frames=50
 # def animate(i):
-#     ax1.plot3D(gut[0::3][:int(len(timearr)*i/frames)],gvt[0::3][:int(len(timearr)*i/frames)],grt[0::3][:int(len(timearr)*i/frames)])
-#     ax1.plot3D(gut[1::3][:int(len(timearr)*i/frames)],gvt[1::3][:int(len(timearr)*i/frames)],grt[1::3][:int(len(timearr)*i/frames)])
-#     ax1.plot3D(gut[2::3][:int(len(timearr)*i/frames)],gvt[2::3][:int(len(timearr)*i/frames)],grt[2::3][:int(len(timearr)*i/frames)])
-#     part1x,part1y,part1z=hypercirch3(array([sinh(gat[0::3][int(len(timearr)*i/frames)]),cosh(gat[0::3][int(len(timearr)*i/frames)])*sinh(gbt[0::3][int(len(timearr)*i/frames)]),cosh(gat[0::3][int(len(timearr)*i/frames)])*cosh(gbt[0::3][int(len(timearr)*i/frames)])*sinh(ggt[0::3][int(len(timearr)*i/frames)]),cosh(gat[0::3][int(len(timearr)*i/frames)])*cosh(gbt[0::3][int(len(timearr)*i/frames)])*cosh(ggt[0::3][int(len(timearr)*i/frames)])]),particles[0][7])
-#     part2x,part2y,part2z=hypercirch3(array([sinh(gat[1::3][int(len(timearr)*i/frames)]),cosh(gat[1::3][int(len(timearr)*i/frames)])*sinh(gbt[1::3][int(len(timearr)*i/frames)]),cosh(gat[1::3][int(len(timearr)*i/frames)])*cosh(gbt[1::3][int(len(timearr)*i/frames)])*sinh(ggt[1::3][int(len(timearr)*i/frames)]),cosh(gat[1::3][int(len(timearr)*i/frames)])*cosh(gbt[1::3][int(len(timearr)*i/frames)])*cosh(ggt[1::3][int(len(timearr)*i/frames)])]),particles[1][7])
-#     part3x,part3y,part3z=hypercirch3(array([sinh(gat[2::3][int(len(timearr)*i/frames)]),cosh(gat[2::3][int(len(timearr)*i/frames)])*sinh(gbt[2::3][int(len(timearr)*i/frames)]),cosh(gat[2::3][int(len(timearr)*i/frames)])*cosh(gbt[2::3][int(len(timearr)*i/frames)])*sinh(ggt[2::3][int(len(timearr)*i/frames)]),cosh(gat[2::3][int(len(timearr)*i/frames)])*cosh(gbt[2::3][int(len(timearr)*i/frames)])*cosh(ggt[2::3][int(len(timearr)*i/frames)])]),particles[2][7])
+#     ax1.plot3D(gut[0::4][:int(len(timearr)*i/frames)],gvt[0::4][:int(len(timearr)*i/frames)],grt[0::4][:int(len(timearr)*i/frames)])
+#     ax1.plot3D(gut[1::4][:int(len(timearr)*i/frames)],gvt[1::4][:int(len(timearr)*i/frames)],grt[1::4][:int(len(timearr)*i/frames)])
+#     ax1.plot3D(gut[2::4][:int(len(timearr)*i/frames)],gvt[2::4][:int(len(timearr)*i/frames)],grt[2::4][:int(len(timearr)*i/frames)])
+#     ax1.plot3D(gut[3::4][:int(len(timearr)*i/frames)],gvt[3::4][:int(len(timearr)*i/frames)],grt[3::4][:int(len(timearr)*i/frames)])
+#     part1x,part1y,part1z=hypercirch3(array([sinh(gat[0::4][int(len(timearr)*i/frames)])*sin(gbt[0::4][int(len(timearr)*i/frames)])*cos(ggt[0::4][int(len(timearr)*i/frames)]),sinh(gat[0::4][int(len(timearr)*i/frames)])*sin(gbt[0::4][int(len(timearr)*i/frames)])*sin(ggt[0::4][int(len(timearr)*i/frames)]),sinh(gat[0::4][int(len(timearr)*i/frames)])*cos(gbt[0::4][int(len(timearr)*i/frames)]),cosh(gat[0::4][int(len(timearr)*i/frames)])]),particles[0][7])
+#     part2x,part2y,part2z=hypercirch3(array([sinh(gat[1::4][int(len(timearr)*i/frames)])*sin(gbt[1::4][int(len(timearr)*i/frames)])*cos(ggt[1::4][int(len(timearr)*i/frames)]),sinh(gat[1::4][int(len(timearr)*i/frames)])*sin(gbt[1::4][int(len(timearr)*i/frames)])*sin(ggt[1::4][int(len(timearr)*i/frames)]),sinh(gat[1::4][int(len(timearr)*i/frames)])*cos(gbt[1::4][int(len(timearr)*i/frames)]),cosh(gat[1::4][int(len(timearr)*i/frames)])]),particles[1][7])
+#     part3x,part3y,part3z=hypercirch3(array([sinh(gat[2::4][int(len(timearr)*i/frames)])*sin(gbt[2::4][int(len(timearr)*i/frames)])*cos(ggt[2::4][int(len(timearr)*i/frames)]),sinh(gat[2::4][int(len(timearr)*i/frames)])*sin(gbt[2::4][int(len(timearr)*i/frames)])*sin(ggt[2::4][int(len(timearr)*i/frames)]),sinh(gat[2::4][int(len(timearr)*i/frames)])*cos(gbt[2::4][int(len(timearr)*i/frames)]),cosh(gat[2::4][int(len(timearr)*i/frames)])]),particles[2][7])
+#     part4x,part4y,part4z=hypercirch3(array([sinh(gat[3::4][int(len(timearr)*i/frames)])*sin(gbt[3::4][int(len(timearr)*i/frames)])*cos(ggt[3::4][int(len(timearr)*i/frames)]),sinh(gat[3::4][int(len(timearr)*i/frames)])*sin(gbt[3::4][int(len(timearr)*i/frames)])*sin(ggt[3::4][int(len(timearr)*i/frames)]),sinh(gat[3::4][int(len(timearr)*i/frames)])*cos(gbt[3::4][int(len(timearr)*i/frames)]),cosh(gat[3::4][int(len(timearr)*i/frames)])]),particles[3][7])
 #     ball1[0].remove()
 #     ball1[0]=ax1.plot_surface(part1x,part1y,part1z, color="b")
 #     ball2[0].remove()
-#     ball2[0]=ax1.plot_surface(part2x,part2y,part2z, color="b")
+#     ball2[0]=ax1.plot_surface(part2x,part2y,part2z, color="r")
 #     ball3[0].remove()
-#     ball3[0]=ax1.plot_surface(part3x,part3y,part3z, color="b")
+#     ball3[0]=ax1.plot_surface(part3x,part3y,part3z, color="k")
+#     ball4[0].remove()
+#     ball4[0]=ax1.plot_surface(part4x,part4y,part4z, color="g")
 
 # # equivalent to rcParams['animation.html'] = 'html5'
 # rc('animation', html='html5')
@@ -349,5 +368,5 @@ plt.show()
 # # have changed.
 # anim = animation.FuncAnimation(fig, animate,frames=frames, interval=50)
 
-# anim.save('./h3spring_test.gif', writer='imagemagick')
+# anim.save('./h3spring4_test.gif', writer='imagemagick')
 
