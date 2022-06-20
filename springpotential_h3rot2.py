@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot2
+from symint_bank import imph3sprot2,imph3sprot2_condense
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -24,8 +24,8 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 
 # Parallel Initial Velocities
 particles=array([
-    np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),.5,.0),[1.,.2])),      #particle 1
-    np.concatenate((array([.5,np.pi/2.,3.*np.pi/2.]),initial_con(array([.5,np.pi/2.,3.*np.pi/2.]),.5,.0),[1.,.2]))       #particle 2
+    np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),.5,.5),[1.,.2])),      #particle 1
+    np.concatenate((array([.5,np.pi/2.,3.*np.pi/2.]),initial_con(array([.5,np.pi/2.,3.*np.pi/2.]),.5,.5),[1.,.2]))       #particle 2
     ])
 
 # Anti-Parallel Initial Velocities
@@ -80,7 +80,7 @@ dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2
 
 # Numerical Integration step
 step_data=array([
-	imph3sprot2(positions, velocities, delT, masses, spring_arr)
+	imph3sprot2_condense(positions, velocities, delT, masses, spring_arr)
 	])
 
 # Include the first time step
@@ -106,7 +106,7 @@ while(q < nump-1):
         nextdot = array([step_data[0][6:9], step_data[0][9:]])
 
     step_data=array([
-        imph3sprot2(nextpos, nextdot, delT, masses, spring_arr)
+        imph3sprot2_condense(nextpos, nextdot, delT, masses, spring_arr)
         ])
 
     gat=append(gat, array([step_data[0][0],step_data[0][3]]))
