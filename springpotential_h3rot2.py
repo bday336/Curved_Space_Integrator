@@ -24,8 +24,8 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 
 # Parallel Initial Velocities
 particles=array([
-    np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),.5,.5),[1.,.2])),      #particle 1
-    np.concatenate((array([.5,np.pi/2.,3.*np.pi/2.]),initial_con(array([.5,np.pi/2.,3.*np.pi/2.]),.5,.5),[1.,.2]))       #particle 2
+    np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),.5,.0),[1.,.2])),      #particle 1
+    np.concatenate((array([.5,np.pi/2.,3.*np.pi/2.]),initial_con(array([.5,np.pi/2.,3.*np.pi/2.]),.5,.0),[1.,.2]))       #particle 2
     ])
 
 # Anti-Parallel Initial Velocities

@@ -1938,6 +1938,13 @@ def imph3sprot2(posn_arr, veln_arr, step, mass_arr, spring_arr):
     #print(val1[9:17])
     return val1
 
+# This is the dumb-bell solver using the condensed structure for setting up
+# the geodesic and spring potential terms for the solver. This is designed to
+# make integration of more complex meshs more streamlined. I have checked to make
+# sure that it is the same output as the old solver, so I will try to use this as
+# the default solver structure moving forward. I need to update the solvers for
+# the triangle and tetrahedron to follow this same structure.
+
 def imph3sprot2_condense(posn_arr, veln_arr, step, mass_arr, spring_arr):
 
     # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
@@ -2045,62 +2052,126 @@ def imph3sprot2_condense(posn_arr, veln_arr, step, mass_arr, spring_arr):
         def da2da1V12(m, f, k, l, d12, da1d12, da2d12, df, da2d12da1):
             return -k/(m*f*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) + ( arccosh(d12) - l )*( da2d12da1 - da1d12*(df/f + d12*da2d12/(d12**2. - 1.)) ) )
 
+        def derivative_terms(a1, b1, g1, a2, b2, g2):
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            # Second derivatives of D function
+            da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+            db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+            dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+            da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+            db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+            dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
+            
+            da1d12b1=db1d12a1
+            db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+            dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+            da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+            dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+            da1d12g1=dg1d12a1
+            db1d12g1=dg1d12b1
+            dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+            da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+            da1d12a2=da2d12a1
+            db1d12a2=da2d12b1
+            dg1d12a2=da2d12g1
+            da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+            dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+            da1d12b2=db2d12a1
+            db1d12b2=db2d12b1
+            dg1d12b2=db2d12g1
+            da2d12b2=db2d12a2
+            db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+            da1d12g2=dg2d12a1
+            db1d12g2=dg2d12b1
+            dg1d12g2=dg2d12g1
+            da2d12g2=dg2d12a2
+            db2d12g2=dg2d12b2
+            dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12],
+                [ # Second derivatives of D function
+                    [
+                        da1d12a1,
+                        db1d12a1,
+                        dg1d12a1,
+                        da2d12a1,
+                        db2d12a1,
+                        dg2d12a1
+                    ],
+                    [
+                        da1d12b1,
+                        db1d12b1,
+                        dg1d12b1,
+                        da2d12b1,
+                        db2d12b1,
+                        dg2d12b1
+                    ],
+                    [
+                        da1d12g1,
+                        db1d12g1,
+                        dg1d12g1,
+                        da2d12g1,
+                        db2d12g1,
+                        dg2d12g1
+                    ],
+                    [
+                        da1d12a2,
+                        db1d12a2,
+                        dg1d12a2,
+                        da2d12a2,
+                        db2d12a2,
+                        dg2d12a2
+                    ],
+                    [
+                        da1d12b2,
+                        db1d12b2,
+                        dg1d12b2,
+                        da2d12b2,
+                        db2d12b2,
+                        dg2d12b2
+                    ],
+                    [
+                        da1d12g2,
+                        db1d12g2,
+                        dg1d12g2,
+                        da2d12g2,
+                        db2d12g2,
+                        dg2d12g2
+                    ],
+                ]
+            ]
+
         a1,b1,g1=positions[0]
         a2,b2,g2=positions[1]
-        
-        
         ### Spring 1-2 spring_arr[0]###
-        # D function
-        d12=D12(a1, b1, g1, a2, b2, g2)
-        # First derivatives of D function
-        da1d12=da1D12(a1, b1, g1, a2, b2, g2)
-        db1d12=db1D12(a1, b1, g1, a2, b2, g2)
-        dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
-        da2d12=da1D12(a2, b2, g2, a1, b1, g1)
-        db2d12=db1D12(a2, b2, g2, a1, b1, g1)
-        dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
-        # Second derivatives of D function
-        da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
-        db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
-        dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
-        da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
-        db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
-        dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
-        
-        da1d12b1=db1d12a1
-        db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
-        dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
-        da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
-        db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
-        dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+        sp12_darr=derivative_terms(a1, b1, g1, a2, b2, g2)
 
-        da1d12g1=dg1d12a1
-        db1d12g1=dg1d12b1
-        dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
-        da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
-        db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
-        dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
-
-        da1d12a2=da2d12a1
-        db1d12a2=da2d12b1
-        dg1d12a2=da2d12g1
-        da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
-        db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
-        dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
-
-        da1d12b2=db2d12a1
-        db1d12b2=db2d12b1
-        dg1d12b2=db2d12g1
-        da2d12b2=db2d12a2
-        db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
-        dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
-
-        da1d12g2=dg2d12a1
-        db1d12g2=dg2d12b1
-        dg1d12g2=dg2d12g1
-        da2d12g2=dg2d12a2
-        db2d12g2=dg2d12b2
-        dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
         
 
         return array([
@@ -2110,34 +2181,34 @@ def imph3sprot2_condense(posn_arr, veln_arr, step, mass_arr, spring_arr):
             # ---------- #
 
             [
-                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], d12, da1d12, da1d12, 0., da1d12a1),  # ad1 a1
-                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], d12, da1d12, db1d12, 0., db1d12a1),  # ad1 b1
-                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], d12, da1d12, dg1d12, 0., dg1d12a1),  # ad1 g1
-                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], d12, da1d12, da2d12, 0., da2d12a1),  # ad1 a2
-                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], d12, da1d12, db2d12, 0., db2d12a1),  # ad1 b2
-                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], d12, da1d12, dg2d12, 0., dg2d12a1)   # ad1 g2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][0], 0., sp12_darr[2][0][0]),  # ad1 a1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][1], 0., sp12_darr[2][0][1]),  # ad1 b1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][2], 0., sp12_darr[2][0][2]),  # ad1 g1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][3], 0., sp12_darr[2][0][3]),  # ad1 a2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][4], 0., sp12_darr[2][0][4]),  # ad1 b2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][5], 0., sp12_darr[2][0][5])   # ad1 g2
             ],
 
             # ---------- #
 
             [
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], d12, db1d12, da1d12, sinh(2.*a1), da1d12b1),  # bd1 a1
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], d12, db1d12, db1d12, 0.,          db1d12b1),  # bd1 b1
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], d12, db1d12, dg1d12, 0.,          dg1d12b1),  # bd1 g1
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], d12, db1d12, da2d12, 0.,          da2d12b1),  # bd1 a2
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], d12, db1d12, db2d12, 0.,          db2d12b1),  # bd1 b2
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], d12, db1d12, dg2d12, 0.,          dg2d12b1)   # bd1 g2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][0], sinh(2.*a1), sp12_darr[2][1][0]),  # bd1 a1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][1], 0.,          sp12_darr[2][1][1]),  # bd1 b1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][2], 0.,          sp12_darr[2][1][2]),  # bd1 g1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][3], 0.,          sp12_darr[2][1][3]),  # bd1 a2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][4], 0.,          sp12_darr[2][1][4]),  # bd1 b2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][5], 0.,          sp12_darr[2][1][5])   # bd1 g2
             ],
 
             # ---------- #
 
             [
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], d12, dg1d12, da1d12, sinh(2.*a1)*sin(b1)*sin(b1),  da1d12g1),  # gd1 a1
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], d12, dg1d12, db1d12, sin(2.*b1)*sinh(a1)*sinh(a1), db1d12g1),  # gd1 b1
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], d12, dg1d12, dg1d12, 0.,                           dg1d12g1),  # gd1 g1
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], d12, dg1d12, da2d12, 0.,                           da2d12g1),  # gd1 a2
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], d12, dg1d12, db2d12, 0.,                           db2d12g1),  # gd1 b2
-                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], d12, dg1d12, dg2d12, 0.,                           dg2d12g1)   # gd1 g2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][0], sinh(2.*a1)*sin(b1)*sin(b1),  sp12_darr[2][2][0]),  # gd1 a1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][1], sin(2.*b1)*sinh(a1)*sinh(a1), sp12_darr[2][2][1]),  # gd1 b1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][2], 0.,                           sp12_darr[2][2][2]),  # gd1 g1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][3], 0.,                           sp12_darr[2][2][3]),  # gd1 a2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][4], 0.,                           sp12_darr[2][2][4]),  # gd1 b2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][5], 0.,                           sp12_darr[2][2][5])   # gd1 g2
             ],
 
             # ---------- #
@@ -2145,34 +2216,34 @@ def imph3sprot2_condense(posn_arr, veln_arr, step, mass_arr, spring_arr):
             # ---------- #
 
             [
-                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], d12, da2d12, da1d12, 0., da1d12a2),  # ad2 a1
-                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], d12, da2d12, db1d12, 0., db1d12a2),  # ad2 b1
-                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], d12, da2d12, dg1d12, 0., dg1d12a2),  # ad2 g1
-                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], d12, da2d12, da2d12, 0., da2d12a2),  # ad2 a2
-                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], d12, da2d12, db2d12, 0., db2d12a2),  # ad2 b2
-                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], d12, da2d12, dg2d12, 0., dg2d12a2)   # ad2 g2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][0], 0., sp12_darr[2][3][0]),  # ad2 a1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][1], 0., sp12_darr[2][3][1]),  # ad2 b1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][2], 0., sp12_darr[2][3][2]),  # ad2 g1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][3], 0., sp12_darr[2][3][3]),  # ad2 a2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][4], 0., sp12_darr[2][3][4]),  # ad2 b2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][5], 0., sp12_darr[2][3][5])   # ad2 g2
             ],
 
             # ---------- #
 
             [
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], d12, db2d12, da1d12, sinh(2.*a2), da1d12b2),  # bd2 a1
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], d12, db2d12, db1d12, 0.,          db1d12b2),  # bd2 b1
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], d12, db2d12, dg1d12, 0.,          dg1d12b2),  # bd2 g1
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], d12, db2d12, da2d12, 0.,          da2d12b2),  # bd2 a2
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], d12, db2d12, db2d12, 0.,          db2d12b2),  # bd2 b2
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], d12, db2d12, dg2d12, 0.,          dg2d12b2)   # bd2 g2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][0], sinh(2.*a2), sp12_darr[2][4][0]),  # bd2 a1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][1], 0.,          sp12_darr[2][4][1]),  # bd2 b1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][2], 0.,          sp12_darr[2][4][2]),  # bd2 g1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][3], 0.,          sp12_darr[2][4][3]),  # bd2 a2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][4], 0.,          sp12_darr[2][4][4]),  # bd2 b2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][5], 0.,          sp12_darr[2][4][5])   # bd2 g2
             ],
 
             # ---------- #
 
             [
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], d12, dg2d12, da1d12, sinh(2.*a2)*sin(b2)*sin(b2),  da1d12g2),  # gd2 a1
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], d12, dg2d12, db1d12, sin(2.*b2)*sinh(a2)*sinh(a2), db1d12g2),  # gd2 b1
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], d12, dg2d12, dg1d12, 0.,                           dg1d12g2),  # gd2 g1
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], d12, dg2d12, da2d12, 0.,                           da2d12g2),  # gd2 a2
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], d12, dg2d12, db2d12, 0.,                           db2d12g2),  # gd2 b2
-                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], d12, dg2d12, dg2d12, 0.,                           dg2d12g2)   # gd2 g2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][0], sinh(2.*a2)*sin(b2)*sin(b2),  sp12_darr[2][5][0]),  # gd2 a1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][1], sin(2.*b2)*sinh(a2)*sinh(a2), sp12_darr[2][5][1]),  # gd2 b1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][2], 0.,                           sp12_darr[2][5][2]),  # gd2 g1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][3], 0.,                           sp12_darr[2][5][3]),  # gd2 a2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][4], 0.,                           sp12_darr[2][5][4]),  # gd2 b2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][5], 0.,                           sp12_darr[2][5][5])   # gd2 g2
             ]
 
         ])
