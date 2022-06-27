@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot2,imph3sprot2_condense
+from symint_bank import imph3sprot2,imph3sprot2_condense, imph3sprot2_condense_econ
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -86,14 +86,15 @@ ggt=append(ggt, array([positions[0][2],positions[1][2]]))
 dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
 # Energy of system
-energy_dat=append(energy_dat,(
+energy = (
     .5*masses[0]*( velocities[0][0]*velocities[0][0] + sinh(gat[-2])*sinh(gat[-2])*velocities[0][1]*velocities[0][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*velocities[0][2]*velocities[0][2] ) +
     .5*masses[1]*( velocities[1][0]*velocities[1][0] + sinh(gat[-1])*sinh(gat[-1])*velocities[1][1]*velocities[1][1] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*velocities[1][2]*velocities[1][2] ) +
-    .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.))
+    .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.)
+energy_dat=append(energy_dat,energy)
 
 # Numerical Integration step
 step_data=array([
-	imph3sprot2_condense(positions, velocities, delT, masses, spring_arr)
+	imph3sprot2_condense_econ(positions, velocities, delT, masses, spring_arr, energy)
 	])
 
 # Include the first time step
@@ -105,10 +106,7 @@ ggt=append(ggt, array([step_data[0][2],step_data[0][5]]))
 dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
 # Energy of system
-energy_dat=append(energy_dat,(
-    .5*masses[0]*( step_data[0][0]*step_data[0][0] + sinh(gat[-2])*sinh(gat[-2])*step_data[0][1]*step_data[0][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*step_data[0][2]*step_data[0][2] ) +
-    .5*masses[1]*( step_data[0][3]*step_data[0][3] + sinh(gat[-1])*sinh(gat[-1])*step_data[0][4]*step_data[0][4] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*step_data[0][5]*step_data[0][5] ) +
-    .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.))
+energy_dat=append(energy_dat,step_data[0][12])
 
 q=q+1
 
@@ -122,10 +120,11 @@ while(q < nump-1):
         nextdot= collisionh3(step_data[0][:3], step_data[1][:3],step_data[0][3:6], step_data[1][3:6],particles[0][6],particles[1][6],dist)
     else:
         nextpos = array([step_data[0][0:3], step_data[0][3:6]])
-        nextdot = array([step_data[0][6:9], step_data[0][9:]])
+        nextdot = array([step_data[0][6:9], step_data[0][9:12]])
+        next_energy = step_data[0][12]
 
     step_data=array([
-        imph3sprot2_condense(nextpos, nextdot, delT, masses, spring_arr)
+        imph3sprot2_condense_econ(nextpos, nextdot, delT, masses, spring_arr, next_energy)
         ])
 
     gat=append(gat, array([step_data[0][0],step_data[0][3]]))
@@ -136,10 +135,7 @@ while(q < nump-1):
     dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
     # Energy of system
-    energy_dat=append(energy_dat,(
-    .5*masses[0]*( step_data[0][0]*step_data[0][0] + sinh(gat[-2])*sinh(gat[-2])*step_data[0][1]*step_data[0][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*step_data[0][2]*step_data[0][2] ) +
-    .5*masses[1]*( step_data[0][3]*step_data[0][3] + sinh(gat[-1])*sinh(gat[-1])*step_data[0][4]*step_data[0][4] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*step_data[0][5]*step_data[0][5] ) +
-    .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.))
+    energy_dat=append(energy_dat,step_data[0][12])
 
     q=q+1
 
@@ -246,7 +242,7 @@ ax2.legend(loc='lower right')
 # ax3.plot(timearr,(dist12-spring_arr[0][1])*spring_arr[0][0],label="Spring 12 Force")
 # # ax3.set_yscale("log",basey=10)
 # ax3.set_xlabel('time (s)')	
-# ax3.legend(loc='lower right')
+# ax3.legend(loc='lower right')	
 
 # Energy Plot
 ax3=fig.add_subplot(1,3,3)

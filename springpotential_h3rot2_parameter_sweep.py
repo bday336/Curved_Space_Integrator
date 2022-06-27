@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot2
+from symint_bank import imph3sprot2,imph3sprot2_condense
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -55,7 +55,7 @@ for v in arange(1.,11.,1.): # max for each was set to 11
 
             # Intialize the time stepping for the integrator.
             delT=.01
-            maxT=10+delT
+            maxT=5+delT
             nump=maxT/delT
             timearr=np.arange(0,maxT,delT)
 
@@ -89,7 +89,7 @@ for v in arange(1.,11.,1.): # max for each was set to 11
 
             # Numerical Integration step
             step_data=array([
-                imph3sprot2(positions, velocities, delT, masses, spring_arr)
+                imph3sprot2_condense(positions, velocities, delT, masses, spring_arr)
                 ])
 
             # Include the first time step
@@ -115,7 +115,7 @@ for v in arange(1.,11.,1.): # max for each was set to 11
                     nextdot = array([step_data[0][6:9], step_data[0][9:]])
 
                 step_data=array([
-                    imph3sprot2(nextpos, nextdot, delT, masses, spring_arr)
+                    imph3sprot2_condense(nextpos, nextdot, delT, masses, spring_arr)
                     ])
 
                 gat=append(gat, array([step_data[0][0],step_data[0][3]]))
