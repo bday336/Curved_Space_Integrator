@@ -1,5 +1,5 @@
 from symint_bank import imph3sprot2,imph3sprot2_condense, imph3sprot2_condense_econ
-from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
+from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con,initial_con_print
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
@@ -47,7 +47,7 @@ particles=array([
 # { spring constant (k) , equilibrium length of spring (l_{eq}) }
 # The value for equilibrium length was calculated on mathematica
 spring_arr=array([
-    [2.,1.]    #spring 12
+    [1.,1.]    #spring 12
     ])
 
 # Intialize the time stepping for the integrator.
@@ -151,7 +151,7 @@ for b in range(len(gat)):
     gvt=append(gvt,sinh(gat[b])*sin(gbt[b])*sin(ggt[b])/(cosh(gat[b]) + 1.))
     grt=append(grt,sinh(gat[b])*cos(gbt[b])/(cosh(gat[b]) + 1.))	
 
-print((dist12-spring_arr[0][1]).max())    	     		
+print(dist12.max())    	     		
 
 #####################
 #  PLOTTING SECTION #
@@ -226,15 +226,26 @@ ax1.plot_surface(part1x, part1y, part1z, color="b")
 ax1.plot_surface(part2x, part2y, part2z, color="r")
 
 # Displacement Plot
+# ax2=fig.add_subplot(1,3,2)
+
+# ax2.plot(timearr,(dist12-spring_arr[0][1]),label="Spring 12 Displacement")
+# #ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
+# #ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
+# #ax2.set_yscale("log",basey=10)	
+# #ax2.set_ylabel('displacement (m)')
+# ax2.set_xlabel('time (s)')
+# ax2.legend(loc='lower right')
+
+# Distance Plot
 ax2=fig.add_subplot(1,3,2)
 
-ax2.plot(timearr,(dist12-spring_arr[0][1]),label="Spring 12 Displacement")
+ax2.plot(timearr,dist12,label="Spring 12 Distance")
 #ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
 #ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
 #ax2.set_yscale("log",basey=10)	
 #ax2.set_ylabel('displacement (m)')
 ax2.set_xlabel('time (s)')
-ax2.legend(loc='lower right')	
+ax2.legend(loc='lower right')
 
 # Force Plot
 # ax3=fig.add_subplot(1,3,3)

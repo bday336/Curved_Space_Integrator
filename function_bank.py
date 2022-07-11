@@ -103,6 +103,9 @@ def initial_con(pos,trans_vel,rot_vel):
    gd = (killing_vec[1]*cos(pos[2])-killing_vec[0]*sin(pos[2]))/(sinh(pos[0])*sin(pos[1]))
    return array([ad,bd,gd])
 
+def initial_con_print(pos,trans_vel,rot_vel):
+   return array([trans_vel*cosh(pos[0]),rot_vel*sinh(pos[0])*cos(pos[1]),-rot_vel*sinh(pos[0])*sin(pos[1])*sin(pos[2]),trans_vel*sinh(pos[0])*sin(pos[1])*cos(pos[2])])
+
 # Generate sphere for plotting purposes
 
 def hypercirch2(center,rad):

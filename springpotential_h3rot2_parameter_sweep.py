@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot2,imph3sprot2_condense
+from symint_bank import imph3sprot2,imph3sprot2_condense, imph3sprot2_condense_econ
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -11,9 +11,9 @@ from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arcc
 tot_max_dist_arr=[]     # Array of maximum distance of masses
 tot_max_disp_arr=[]     # Array of maximum displacement of masses from equilibrium length of spring
 tot_max_elong_arr=[]    # Array of maximum elongation percent
-for v in arange(1.,11.,1.): # max for each was set to 11
-    for l in arange(1.,11.,1.): # 10 entries
-        for k in arange(0,11.,1.): # 11 entries
+for v in arange(1.,7.,1.): # max for each was set to 11 (1,11,1)
+    for l in arange(1.,7.,1.): # 10 entries (1,11,1)
+        for k in arange(0,7.,1.): # 11 entries (0,11,1)
             print("On v={}, l={}, and k={}".format(v,l,k))
 
             # Initial position (position / velocity in rotational parameterization)
@@ -78,6 +78,7 @@ for v in arange(1.,11.,1.): # max for each was set to 11
             gbt = []
             ggt = []
             dist12 = []
+            energy_dat = []
 
             # Include the intial data
             gat=append(gat, array([positions[0][0],positions[1][0]]))
@@ -87,9 +88,16 @@ for v in arange(1.,11.,1.): # max for each was set to 11
             # Distance between masses
             dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
+            # Energy of system
+            energy = (
+                .5*masses[0]*( velocities[0][0]*velocities[0][0] + sinh(gat[-2])*sinh(gat[-2])*velocities[0][1]*velocities[0][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*velocities[0][2]*velocities[0][2] ) +
+                .5*masses[1]*( velocities[1][0]*velocities[1][0] + sinh(gat[-1])*sinh(gat[-1])*velocities[1][1]*velocities[1][1] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*velocities[1][2]*velocities[1][2] ) +
+                .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.)
+            energy_dat=append(energy_dat,energy)
+
             # Numerical Integration step
             step_data=array([
-                imph3sprot2_condense(positions, velocities, delT, masses, spring_arr)
+                imph3sprot2_condense_econ(positions, velocities, delT, masses, spring_arr, energy)
                 ])
 
             # Include the first time step
@@ -99,6 +107,9 @@ for v in arange(1.,11.,1.): # max for each was set to 11
 
             # Distance between masses
             dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+
+            # Energy of system
+            energy_dat=append(energy_dat,step_data[0][12])
 
             q=q+1
 
@@ -112,10 +123,11 @@ for v in arange(1.,11.,1.): # max for each was set to 11
                     nextdot= collisionh3(step_data[0][:3], step_data[1][:3],step_data[0][3:6], step_data[1][3:6],particles[0][6],particles[1][6],dist)
                 else:
                     nextpos = array([step_data[0][0:3], step_data[0][3:6]])
-                    nextdot = array([step_data[0][6:9], step_data[0][9:]])
+                    nextdot = array([step_data[0][6:9], step_data[0][9:12]])
+                    next_energy = step_data[0][12]
 
                 step_data=array([
-                    imph3sprot2_condense(nextpos, nextdot, delT, masses, spring_arr)
+                    imph3sprot2_condense_econ(nextpos, nextdot, delT, masses, spring_arr, next_energy)
                     ])
 
                 gat=append(gat, array([step_data[0][0],step_data[0][3]]))
@@ -124,6 +136,9 @@ for v in arange(1.,11.,1.): # max for each was set to 11
 
                 # Distance between masses
                 dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+
+                # Energy of system
+                energy_dat=append(energy_dat,step_data[0][12])
 
                 q=q+1
 

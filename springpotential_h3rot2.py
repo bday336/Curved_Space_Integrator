@@ -47,7 +47,7 @@ particles=array([
 # { spring constant (k) , equilibrium length of spring (l_{eq}) }
 # The value for equilibrium length was calculated on mathematica
 spring_arr=array([
-    [2.,1.]    #spring 12
+    [1.,1.]    #spring 12
     ])
 
 # Intialize the time stepping for the integrator.
@@ -106,8 +106,8 @@ dist12=append(dist12,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2
 
 # Energy of system
 energy_dat=append(energy_dat,(
-    .5*masses[0]*( step_data[0][0]*step_data[0][0] + sinh(gat[-2])*sinh(gat[-2])*step_data[0][1]*step_data[0][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*step_data[0][2]*step_data[0][2] ) +
-    .5*masses[1]*( step_data[0][3]*step_data[0][3] + sinh(gat[-1])*sinh(gat[-1])*step_data[0][4]*step_data[0][4] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*step_data[0][5]*step_data[0][5] ) +
+    .5*masses[0]*( step_data[0][6]*step_data[0][6] + sinh(gat[-2])*sinh(gat[-2])*step_data[0][7]*step_data[0][7] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*step_data[0][8]*step_data[0][8] ) +
+    .5*masses[1]*( step_data[0][9]*step_data[0][9] + sinh(gat[-1])*sinh(gat[-1])*step_data[0][10]*step_data[0][10] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*step_data[0][11]*step_data[0][11] ) +
     .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.))
 
 q=q+1
@@ -137,8 +137,8 @@ while(q < nump-1):
 
     # Energy of system
     energy_dat=append(energy_dat,(
-    .5*masses[0]*( step_data[0][0]*step_data[0][0] + sinh(gat[-2])*sinh(gat[-2])*step_data[0][1]*step_data[0][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*step_data[0][2]*step_data[0][2] ) +
-    .5*masses[1]*( step_data[0][3]*step_data[0][3] + sinh(gat[-1])*sinh(gat[-1])*step_data[0][4]*step_data[0][4] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*step_data[0][5]*step_data[0][5] ) +
+    .5*masses[0]*( step_data[0][6]*step_data[0][6] + sinh(gat[-2])*sinh(gat[-2])*step_data[0][7]*step_data[0][7] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*step_data[0][8]*step_data[0][8] ) +
+    .5*masses[1]*( step_data[0][9]*step_data[0][9] + sinh(gat[-1])*sinh(gat[-1])*step_data[0][10]*step_data[0][10] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*step_data[0][11]*step_data[0][11] ) +
     .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2.))
 
     q=q+1

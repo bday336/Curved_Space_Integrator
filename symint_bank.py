@@ -1,4 +1,4 @@
-from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arccos,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,linalg
+from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arccos,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,linalg,add
 from function_bank import boostxh2e,h2dist,boostxh2,rotzh2,convertpos_hyp2paratransh2,convertvel_hyp2paratransh2
 
 # This script is the repository of all the various solvers I have constructed
@@ -1943,7 +1943,7 @@ def imph3sprot2(posn_arr, veln_arr, step, mass_arr, spring_arr):
 # make integration of more complex meshs more streamlined. I have checked to make
 # sure that it is the same output as the old solver, so I will try to use this as
 # the default solver structure moving forward. I need to update the solvers for
-# the triangle and tetrahedron to follow this same structure.
+# the triangle and tetrahedron to follow this same structure. (depreciated)
 
 def imph3sprot2_condense(posn_arr, veln_arr, step, mass_arr, spring_arr):
 
@@ -2536,6 +2536,12 @@ def imph3sprot2_condense(posn_arr, veln_arr, step, mass_arr, spring_arr):
     #print(val1[9:17])
     return val1
 
+# This is the updated version of the solver above. Included the energy conservation
+# constraint to the system being solved. This has greatly helped with keeping
+# the energy from diverging with time. Thought it would help with the limit on how
+# stiff the spring could be in the simulation, but that is still an issue. Now need to
+# modularize the energy inclusion stuff and update the triangle and tetrahedron solvers.
+
 def imph3sprot2_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, energy):
 
     # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
@@ -2834,6 +2840,700 @@ def imph3sprot2_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
                 da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][2], 0.,                           sp12_darr[2][5][2]),  # gd2 g1
                 da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][3], 0.,                           sp12_darr[2][5][3]),  # gd2 a2
                 da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][4], 0.,                           sp12_darr[2][5][4]),  # gd2 b2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][5], 0.,                           sp12_darr[2][5][5])   # gd2 g2
+            ]
+
+        ])
+
+    # This function is to simplify the following function that generates the square matrix of energy terms for the jacobian
+
+    def jacobi_energy_terms(positions, velocities, mass_arr, spring_arr):
+
+        def derivative_terms(a1, b1, g1, a2, b2, g2):
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12
+                ]
+            ]
+
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        ad1,bd1,gd1=velocities[0]
+        ad2,bd2,gd2=velocities[1]
+        ### Spring 1-2 spring_arr[0]###
+        sp12_darr=derivative_terms(a1, b1, g1, a2, b2, g2)
+
+        return array([
+            -mass_arr[0]*sinh(a1)*cosh(a1)*( bd1*bd1 + sin(b1)*sin(b1)*gd1*gd1 ) - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][0] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ),
+            -mass_arr[0]*sin(b1)*cos(b1)*gd1*gd1                                 - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][1] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ),
+            -mass_arr[0]*0.                                                      - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][2] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ),
+            -mass_arr[1]*sinh(a2)*cosh(a2)*( bd2*bd2 + sin(b2)*sin(b2)*gd2*gd2 ) - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][3] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ),
+            -mass_arr[1]*sin(b2)*cos(b2)*gd2*gd2                                 - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][4] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ),
+            -mass_arr[1]*0.                                                      - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][5] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ),
+            -mass_arr[0]*ad1,
+            -mass_arr[0]*sinh(a1)*sinh(a1)*bd1,
+            -mass_arr[0]*sin(b1)*sin(b1)*gd1,
+            -mass_arr[1]*ad2,
+            -mass_arr[1]*sinh(a2)*sinh(a2)*bd2,
+            -mass_arr[1]*sin(b2)*sin(b2)*gd2
+        ])
+
+
+   
+    def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return an1 - an - .5*h*(adn + adn1)
+
+    def con2(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return bn1 - bn - .5*h*(bdn + bdn1)
+
+    def con3(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h): 
+        return gn1 - gn - .5*h*(gdn + gdn1)        
+
+    def con4(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, base_vel, base_vel_guess, m1, h, sp12):
+        def geo_spring_term_ad(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*1.)*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.))
+
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        return (ad1n1 - ad1n - .5*h*(
+            (bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n) + geo_spring_term_ad(a1n, b1n, g1n, a2n, b2n, g2n, m1, sp12)
+            + 
+            (bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1) + geo_spring_term_ad(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, sp12)
+            ))
+
+    def con5(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, base_vel, base_vel_guess, m1, h, sp12):
+        def geo_spring_term_bd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        return (bd1n1 - bd1n - .5*h*(
+            gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n) + geo_spring_term_bd(a1n, b1n, g1n, a2n, b2n, g2n, m1, sp12)
+            + 
+            gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1) + geo_spring_term_bd(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, sp12)
+            ))
+
+    def con6(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, base_vel, base_vel_guess, m1, h, sp12):
+        def geo_spring_term_gd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1)*sin(b1)*sin(b1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+
+        return (gd1n1 - gd1n - .5*h*(
+            -2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n) + geo_spring_term_gd(a1n, b1n, g1n, a2n, b2n, g2n, m1, sp12)
+            + 
+            -2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1) + geo_spring_term_gd(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, sp12)
+            ))
+    
+    def con7(positions, velocities, mass_arr, spring_arr, energy):
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        ad1,bd1,gd1=velocities[0]
+        ad2,bd2,gd2=velocities[1]
+        d12=cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+        return (energy -
+            .5*mass_arr[0]*( ad1*ad1 + sinh(a1)*sinh(a1)*bd1*bd1 + sinh(a1)*sinh(a1)*sin(b1)*sin(b1)*gd1*gd1 ) - 
+            .5*mass_arr[1]*( ad2*ad2 + sinh(a2)*sinh(a2)*bd2*bd2 + sinh(a2)*sinh(a2)*sin(b2)*sin(b2)*gd2*gd2 ) -
+            .5*spring_arr[0][0]*( arccosh(d12) - spring_arr[0][1] )**2.
+            )
+
+
+    
+    def jacobian(positions, velocities, mass_arr, h, spring_arr):
+        def geo_term_arr(a1, b1, g1, ad1, bd1, gd1, h):
+            return [
+                [   # a1, b1, g1 derivatives of adn1 update constraint
+                    -.5*h*(bd1*bd1+sin(b1)*sin(b1)*gd1*gd1)*cosh(2.*a1),
+                    -.25*h*sinh(2.*a1)*sin(2.*b1)*gd1*gd1,
+                    0,
+                ],
+                [   # a1, b1, g1 derivatives of bdn1 update constraint
+                    -h*ad1*bd1/(sinh(a1)*sinh(a1)),
+                    -.5*h*cos(2.*b1)*gd1*gd1,
+                    0.
+                ],
+                [   # a1, b1, g1 derivatives of gdn1 update constraint
+                    -h*ad1*gd1/(sinh(a1)*sinh(a1)),
+                    -h*bd1*gd1/(sin(b1)*sin(b1)),
+                    0.
+                ],
+                [   # ad1, bd1, gd1 derivatives of adn1 update constraint
+                    1.,
+                    -.5*h*sinh(2.*a1)*bd1,
+                    -.5*h*sinh(2.*a1)*sin(b1)*sin(b1)*gd1
+                ],
+                [   # ad1, bd1, gd1 derivatives of bdn1 update constraint
+                    h/tanh(a1)*bd1,
+                    1.+h/tanh(a1)*ad1,
+                    -.5*h*sin(2.*b1)*gd1
+                ],
+                [   # ad1, bd1, gd1 derivatives of gdn1 update constraint
+                    h/tanh(a1)*gd1,
+                    h/tan(b1)*gd1,
+                    1.+h/tanh(a1)*ad1+h/tan(b1)*bd1
+                ]
+            ]
+
+        a1n1,b1n1,g1n1=positions[0]
+        a2n1,b2n1,g2n1=positions[1]
+        ad1n1,bd1n1,gd1n1=velocities[0]
+        ad2n1,bd2n1,gd2n1=velocities[1]
+        spring_terms=jacobi_sp_terms(positions, mass_arr, spring_arr)
+        energy_terms=jacobi_energy_terms(positions, velocities, mass_arr, spring_arr)
+        geo_term_p1=geo_term_arr(a1n1, b1n1, g1n1, ad1n1, bd1n1, gd1n1, h)
+        geo_term_p2=geo_term_arr(a2n1, b2n1, g2n1, ad2n1, bd2n1, gd2n1, h)
+        #print(spring_terms)
+        return array([
+            [1.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0., 0.],
+            [0.,1.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0., 0.],
+            [0.,0.,1., 0.,0.,0., 0.,0.,-.5*h, 0.,0.,0., 0.],
+
+            [0.,0.,0., 1.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.],
+            [0.,0.,0., 0.,1.,0., 0.,0.,0., 0.,-.5*h,0., 0.],
+            [0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,-.5*h, 0.],
+
+            # ad1 update
+            [
+                geo_term_p1[0][0] + spring_terms[0][0],
+                geo_term_p1[0][1] + spring_terms[0][1],
+                geo_term_p1[0][2] + spring_terms[0][2], 
+            
+                spring_terms[0][3],
+                spring_terms[0][4],
+                spring_terms[0][5],
+
+                geo_term_p1[3][0],
+                geo_term_p1[3][1],
+                geo_term_p1[3][2],
+
+                0.,0.,0., 0.
+            ],
+
+            # bd1 update
+            [
+                geo_term_p1[1][0] + spring_terms[1][0],
+                geo_term_p1[1][1] + spring_terms[1][1],
+                geo_term_p1[1][2] + spring_terms[1][2], 
+
+                spring_terms[1][3],
+                spring_terms[1][4],
+                spring_terms[1][5],
+
+                geo_term_p1[4][0],
+                geo_term_p1[4][1],
+                geo_term_p1[4][2],
+
+                0.,0.,0., 0.
+            ],
+
+            # gd1 update
+            [
+                geo_term_p1[2][0] + spring_terms[2][0],
+                geo_term_p1[2][1] + spring_terms[2][1],
+                geo_term_p1[2][2] + spring_terms[2][2],
+
+                spring_terms[2][3],
+                spring_terms[2][4],
+                spring_terms[2][5],
+
+                geo_term_p1[5][0],
+                geo_term_p1[5][1],
+                geo_term_p1[5][2],
+
+                0.,0.,0., 0.
+            ],
+
+            # ad2 update
+            [
+                spring_terms[3][0],
+                spring_terms[3][1],
+                spring_terms[3][2],
+
+                geo_term_p2[0][0] + spring_terms[3][3],
+                geo_term_p2[0][1] + spring_terms[3][4],
+                geo_term_p2[0][2] + spring_terms[3][5],
+
+                0.,0.,0.,
+
+                geo_term_p2[3][0],
+                geo_term_p2[3][1],
+                geo_term_p2[3][2], 0.
+            ],
+
+            # bd2 update
+            [
+                spring_terms[4][0],
+                spring_terms[4][1],
+                spring_terms[4][2],
+
+                geo_term_p2[1][0] + spring_terms[4][3],
+                geo_term_p2[1][1] + spring_terms[4][4],
+                geo_term_p2[1][2] + spring_terms[4][5],
+
+                0.,0.,0.,
+
+                geo_term_p2[4][0],
+                geo_term_p2[4][1],
+                geo_term_p2[4][2], 0.
+            ],
+
+            # gd2 update
+            [
+                spring_terms[5][0],
+                spring_terms[5][1],
+                spring_terms[5][2],
+
+                geo_term_p2[2][0] + spring_terms[5][3],
+                geo_term_p2[2][1] + spring_terms[5][4],
+                geo_term_p2[2][2] + spring_terms[5][5],
+
+                0.,0.,0.,
+
+                geo_term_p2[5][0],
+                geo_term_p2[5][1],
+                geo_term_p2[5][2], 0.
+            ],
+
+            # energy conservation
+            [
+                energy_terms[0],
+                energy_terms[1],
+                energy_terms[2],
+                energy_terms[3],
+                energy_terms[4],
+                energy_terms[5],
+                energy_terms[6],
+                energy_terms[7],
+                energy_terms[8],
+                energy_terms[9],
+                energy_terms[10],
+                energy_terms[11], 1.
+            ]
+        ])
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    diff1=linalg.solve(jacobian(posn_arr, veln_arr, mass_arr, step, spring_arr),-array([
+        #p1
+        con1(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con2(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con3(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        #p2
+        con1(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con2(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con3(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+
+        #v1
+        con4(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0]),
+        con5(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0]),
+        con6(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0]),
+        #v2
+        con4(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0]),
+        con5(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0]),
+        con6(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0]),
+
+        #energy
+        con7(posn_arr, veln_arr, mass_arr, spring_arr, energy)    
+    ]))
+    val1 = array([
+            posn_arr[0][0]+diff1[0], posn_arr[0][1]+diff1[1], posn_arr[0][2]+diff1[2], 
+            posn_arr[1][0]+diff1[3], posn_arr[1][1]+diff1[4], posn_arr[1][2]+diff1[5],
+
+            veln_arr[0][0]+diff1[6], veln_arr[0][1]+diff1[7], veln_arr[0][2]+diff1[8], 
+            veln_arr[1][0]+diff1[9], veln_arr[1][1]+diff1[10], veln_arr[1][2]+diff1[11],
+
+            energy+diff1[12]
+            ])    
+    x = 0
+    while(x < 7):
+        new_pos_arr=array([val1[0:3],val1[3:6]])
+        new_vel_arr=array([val1[6:9],val1[9:12]])
+        new_energy=val1[12]
+        diff2=linalg.solve(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr),-array([
+            #p1
+            con1(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con2(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con3(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            #p2
+            con1(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con2(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con3(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+
+            #v1
+            con4(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0]),
+            con5(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0]),
+            con6(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0]),
+            #v2
+            con4(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0]),
+            con5(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0]),
+            con6(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0]),
+
+            #energy 
+            con7(new_pos_arr, new_vel_arr, mass_arr, spring_arr, new_energy)
+        ]))      
+        val2 = array([
+            val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], 
+            val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5],
+
+            val1[6]+diff2[6], val1[7]+diff2[7], val1[8]+diff2[8],
+            val1[9]+diff2[9], val1[10]+diff2[10], val1[11]+diff2[11],
+
+            val1[12]+diff2[12]
+            ])
+        val1 = val2
+        x=x+1
+    #print(val1[9:17])
+    return val1
+
+# This is the updated version of the solver above. This is my attempt at making a solver
+# that takes in a mesh object. This will be helpful for investigating more complex objects
+# in the curved spaces. The goal is to have the input parameters be the mesh, the initial
+# velocities of each vertex (given by the killing field intializer), data for the masses/springs
+# for the vertices and edges of the mesh, and the energy of the system (for energy conservation).
+# If I can get the infrastructure set up for the single spring system then it should be straight
+# forward to generalize to arbitrary meshs (that is the idea anyways...)
+
+def imph3sprot2_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, energy):
+
+    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
+    # I have found that I do not need to make functions for both particles since I can just flip the arguments
+    # and it should work fine since they are symmetric. In principle, I think that I do not need to generate
+    # any new functions for this system. I just have to be careful with the arguments I use in the functions.
+    # In spring terms are more numerous given that each particle is connected to three other particles. When 
+    # using the below functions the more general notation of Dmn just needs to be considered with 1=m and 2=n.
+    # This is so I do not introduce any unintended errors by changing the variables.
+
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2. This can be used as a general function
+    # I just have to be careful about the arguments for the various particle pairs.
+    def D12(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only three functions are needed instead of six.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
+    # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
+    # dg2D12 = dg1D12(a2, b2, g2, a1, b1, g1)
+    def da1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2) 
+
+    def dg1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)      
+    
+
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
+    # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+    # dg2D12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+    # db2D12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+    # dg2D12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+    # dg2D12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+    # For the remaining lower portion of the total square matrix of terms (fifteen values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*cos(b2) - cosh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def da2D12a1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sinh(a2) - cosh(a1)*cos(b1)*cosh(a2)*cos(b2) - cosh(a1)*sin(b1)*cosh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db2D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cos(b1)*sinh(a2)*sin(b2) - cosh(a1)*sin(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12a1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*cos(b2) + sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def dg1D12g1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg2D12g1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(positions, mass_arr, spring_arr):
+
+        def da2da1V12(m, f, k, l, d12, da1d12, da2d12, df, da2d12da1):
+            return -k/(m*f*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) + ( arccosh(d12) - l )*( da2d12da1 - da1d12*(df/f + d12*da2d12/(d12**2. - 1.)) ) )
+
+        def derivative_terms(a1, b1, g1, a2, b2, g2):
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            # Second derivatives of D function
+            da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+            db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+            dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+            da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+            db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+            dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
+            
+            da1d12b1=db1d12a1
+            db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+            dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+            da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+            dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+            da1d12g1=dg1d12a1
+            db1d12g1=dg1d12b1
+            dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+            da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+            da1d12a2=da2d12a1
+            db1d12a2=da2d12b1
+            dg1d12a2=da2d12g1
+            da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+            dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+            da1d12b2=db2d12a1
+            db1d12b2=db2d12b1
+            dg1d12b2=db2d12g1
+            da2d12b2=db2d12a2
+            db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+            da1d12g2=dg2d12a1
+            db1d12g2=dg2d12b1
+            dg1d12g2=dg2d12g1
+            da2d12g2=dg2d12a2
+            db2d12g2=dg2d12b2
+            dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12],
+                [ # Second derivatives of D function
+                    [
+                        da1d12a1,
+                        db1d12a1,
+                        dg1d12a1,
+                        da2d12a1,
+                        db2d12a1,
+                        dg2d12a1
+                    ],
+                    [
+                        da1d12b1,
+                        db1d12b1,
+                        dg1d12b1,
+                        da2d12b1,
+                        db2d12b1,
+                        dg2d12b1
+                    ],
+                    [
+                        da1d12g1,
+                        db1d12g1,
+                        dg1d12g1,
+                        da2d12g1,
+                        db2d12g1,
+                        dg2d12g1
+                    ],
+                    [
+                        da1d12a2,
+                        db1d12a2,
+                        dg1d12a2,
+                        da2d12a2,
+                        db2d12a2,
+                        dg2d12a2
+                    ],
+                    [
+                        da1d12b2,
+                        db1d12b2,
+                        dg1d12b2,
+                        da2d12b2,
+                        db2d12b2,
+                        dg2d12b2
+                    ],
+                    [
+                        da1d12g2,
+                        db1d12g2,
+                        dg1d12g2,
+                        da2d12g2,
+                        db2d12g2,
+                        dg2d12g2
+                    ],
+                ]
+            ]
+
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        ### Spring 1-2 spring_arr[0]###
+        sp12_darr=derivative_terms(a1, b1, g1, a2, b2, g2)
+
+        
+
+        return array([
+
+            # ---------- #
+            #     V1     #
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][0], 0., sp12_darr[2][0][0]),  # ad1 a1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][1], 0., sp12_darr[2][0][1]),  # ad1 b1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][2], 0., sp12_darr[2][0][2]),  # ad1 g1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][3], 0., sp12_darr[2][0][3]),  # ad1 a2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][4], 0., sp12_darr[2][0][4]),  # ad1 b2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][5], 0., sp12_darr[2][0][5])   # ad1 g2
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][0], sinh(2.*a1), sp12_darr[2][1][0]),  # bd1 a1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][1], 0.,          sp12_darr[2][1][1]),  # bd1 b1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][2], 0.,          sp12_darr[2][1][2]),  # bd1 g1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][3], 0.,          sp12_darr[2][1][3]),  # bd1 a2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][4], 0.,          sp12_darr[2][1][4]),  # bd1 b2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][5], 0.,          sp12_darr[2][1][5])   # bd1 g2
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][0], sinh(2.*a1)*sin(b1)*sin(b1),  sp12_darr[2][2][0]),  # gd1 a1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][1], sin(2.*b1)*sinh(a1)*sinh(a1), sp12_darr[2][2][1]),  # gd1 b1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][2], 0.,                           sp12_darr[2][2][2]),  # gd1 g1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][3], 0.,                           sp12_darr[2][2][3]),  # gd1 a2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][4], 0.,                           sp12_darr[2][2][4]),  # gd1 b2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][5], 0.,                           sp12_darr[2][2][5])   # gd1 g2
+            ],
+
+            # ---------- #
+            #     V2     #
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][0], 0., sp12_darr[2][3][0]),  # ad2 a1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][1], 0., sp12_darr[2][3][1]),  # ad2 b1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][2], 0., sp12_darr[2][3][2]),  # ad2 g1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][3], 0., sp12_darr[2][3][3]),  # ad2 a2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][4], 0., sp12_darr[2][3][4]),  # ad2 b2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][5], 0., sp12_darr[2][3][5])   # ad2 g2
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][0], 0.,          sp12_darr[2][4][0]),  # bd2 a1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][1], 0.,          sp12_darr[2][4][1]),  # bd2 b1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][2], 0.,          sp12_darr[2][4][2]),  # bd2 g1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][3], sinh(2.*a2), sp12_darr[2][4][3]),  # bd2 a2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][4], 0.,          sp12_darr[2][4][4]),  # bd2 b2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][5], 0.,          sp12_darr[2][4][5])   # bd2 g2
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][0], 0.,                           sp12_darr[2][5][0]),  # gd2 a1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][1], 0.,                           sp12_darr[2][5][1]),  # gd2 b1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][2], 0.,                           sp12_darr[2][5][2]),  # gd2 g1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][3], sinh(2.*a2)*sin(b2)*sin(b2),  sp12_darr[2][5][3]),  # gd2 a2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][4], sin(2.*b2)*sinh(a2)*sinh(a2), sp12_darr[2][5][4]),  # gd2 b2
                 da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][5], 0.,                           sp12_darr[2][5][5])   # gd2 g2
             ]
 
@@ -5041,6 +5741,1606 @@ def imph3sprot3(posn_arr, veln_arr, step, mass_arr, spring_arr):
             val1[12]+diff2[12], val1[13]+diff2[13], val1[14]+diff2[14],
             val1[15]+diff2[15], val1[16]+diff2[16], val1[17]+diff2[17]
             ])
+        val1 = val2
+        x=x+1
+    #print(val1[9:17])
+    return val1
+
+def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, energy):
+
+    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
+    # I have found that I do not need to make functions for both particles since I can just flip the arguments
+    # and it should work fine since they are symmetric. In principle, I think that I do not need to generate
+    # any new functions for this system. I just have to be careful with the arguments I use in the functions.
+    # In spring terms are more numerous given that each particle is connected to three other particles. When 
+    # using the below functions the more general notation of Dmn just needs to be considered with 1=m and 2=n.
+    # This is so I do not introduce any unintended errors by changing the variables.
+
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2. This can be used as a general function
+    # I just have to be careful about the arguments for the various particle pairs.
+    def D12(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only three functions are needed instead of six.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
+    # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
+    # dg2D12 = dg1D12(a2, b2, g2, a1, b1, g1)
+    def da1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2) 
+
+    def dg1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)      
+    
+
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
+    # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+    # dg2D12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+    # db2D12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+    # dg2D12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+    # dg2D12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+    # For the remaining lower portion of the total square matrix of terms (fifteen values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*cos(b2) - cosh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def da2D12a1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sinh(a2) - cosh(a1)*cos(b1)*cosh(a2)*cos(b2) - cosh(a1)*sin(b1)*cosh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db2D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cos(b1)*sinh(a2)*sin(b2) - cosh(a1)*sin(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12a1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*cos(b2) + sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def dg1D12g1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg2D12g1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(positions, mass_arr, spring_arr):
+
+        def da2da1V12(m, f, k, l, d12, da1d12, da2d12, df, da2d12da1):
+            return -k/(m*f*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) + ( arccosh(d12) - l )*( da2d12da1 - da1d12*(df/f + d12*da2d12/(d12**2. - 1.)) ) )
+
+        def derivative_terms(a1, b1, g1, a2, b2, g2):
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            # Second derivatives of D function
+            da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+            db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+            dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+            da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+            db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+            dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
+            
+            da1d12b1=db1d12a1
+            db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+            dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+            da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+            dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+            da1d12g1=dg1d12a1
+            db1d12g1=dg1d12b1
+            dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+            da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+            da1d12a2=da2d12a1
+            db1d12a2=da2d12b1
+            dg1d12a2=da2d12g1
+            da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+            dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+            da1d12b2=db2d12a1
+            db1d12b2=db2d12b1
+            dg1d12b2=db2d12g1
+            da2d12b2=db2d12a2
+            db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+            da1d12g2=dg2d12a1
+            db1d12g2=dg2d12b1
+            dg1d12g2=dg2d12g1
+            da2d12g2=dg2d12a2
+            db2d12g2=dg2d12b2
+            dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12],
+                [ # Second derivatives of D function
+                    [
+                        da1d12a1,
+                        db1d12a1,
+                        dg1d12a1,
+                        da2d12a1,
+                        db2d12a1,
+                        dg2d12a1
+                    ],
+                    [
+                        da1d12b1,
+                        db1d12b1,
+                        dg1d12b1,
+                        da2d12b1,
+                        db2d12b1,
+                        dg2d12b1
+                    ],
+                    [
+                        da1d12g1,
+                        db1d12g1,
+                        dg1d12g1,
+                        da2d12g1,
+                        db2d12g1,
+                        dg2d12g1
+                    ],
+                    [
+                        da1d12a2,
+                        db1d12a2,
+                        dg1d12a2,
+                        da2d12a2,
+                        db2d12a2,
+                        dg2d12a2
+                    ],
+                    [
+                        da1d12b2,
+                        db1d12b2,
+                        dg1d12b2,
+                        da2d12b2,
+                        db2d12b2,
+                        dg2d12b2
+                    ],
+                    [
+                        da1d12g2,
+                        db1d12g2,
+                        dg1d12g2,
+                        da2d12g2,
+                        db2d12g2,
+                        dg2d12g2
+                    ],
+                ]
+            ]
+
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        a3,b3,g3=positions[2]
+        ### Spring 1-2 spring_arr[0]###
+        sp12_darr=derivative_terms(a1, b1, g1, a2, b2, g2)
+        ### Spring 1-3 spring_arr[1]###
+        sp13_darr=derivative_terms(a1, b1, g1, a3, b3, g3)
+        ### Spring 2-3 spring_arr[2]###
+        sp23_darr=derivative_terms(a2, b2, g2, a3, b3, g3)
+
+        
+
+        return array([
+
+            # ---------- #
+            #     V1     # 
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][0], 0., sp12_darr[2][0][0]) +
+                da2da1V12(mass_arr[0], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][0], sp13_darr[1][0], 0., sp13_darr[2][0][0]),  # ad1 a1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][1], 0., sp12_darr[2][0][1]) +
+                da2da1V12(mass_arr[0], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][0], sp13_darr[1][1], 0., sp13_darr[2][0][1]),  # ad1 b1
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][2], 0., sp12_darr[2][0][2]) +
+                da2da1V12(mass_arr[0], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][0], sp13_darr[1][2], 0., sp13_darr[2][0][2]),  # ad1 g1
+
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][3], 0., sp12_darr[2][0][3]),  # ad1 a2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][4], 0., sp12_darr[2][0][4]),  # ad1 b2
+                da2da1V12(mass_arr[0], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][0], sp12_darr[1][5], 0., sp12_darr[2][0][5]),  # ad1 g2
+
+                da2da1V12(mass_arr[0], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][0], sp13_darr[1][3], 0., sp13_darr[2][0][3]),  # ad1 a3
+                da2da1V12(mass_arr[0], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][0], sp13_darr[1][4], 0., sp13_darr[2][0][4]),  # ad1 b3
+                da2da1V12(mass_arr[0], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][0], sp13_darr[1][5], 0., sp13_darr[2][0][5])   # ad1 g3
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][0], sinh(2.*a1), sp12_darr[2][1][0]) +
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][1], sp13_darr[1][0], sinh(2.*a1), sp13_darr[2][1][0]),  # bd1 a1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][1], 0.,          sp12_darr[2][1][1]) +
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][1], sp13_darr[1][1], 0.,          sp13_darr[2][1][1]),  # bd1 b1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][2], 0.,          sp12_darr[2][1][2]) +
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][1], sp13_darr[1][2], 0.,          sp13_darr[2][1][2]),  # bd1 g1
+
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][3], 0.,          sp12_darr[2][1][3]),  # bd1 a2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][4], 0.,          sp12_darr[2][1][4]),  # bd1 b2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][1], sp12_darr[1][5], 0.,          sp12_darr[2][1][5]),  # bd1 g2
+
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][1], sp13_darr[1][3], 0.,          sp13_darr[2][1][3]),  # bd1 a3
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][1], sp13_darr[1][4], 0.,          sp13_darr[2][1][4]),  # bd1 b3
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][1], sp13_darr[1][5], 0.,          sp13_darr[2][1][5])   # bd1 g3
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][0], sinh(2.*a1)*sin(b1)*sin(b1),  sp12_darr[2][2][0]) +
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][2], sp13_darr[1][0], sinh(2.*a1)*sin(b1)*sin(b1),  sp13_darr[2][2][0]),  # gd1 a1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][1], sin(2.*b1)*sinh(a1)*sinh(a1), sp12_darr[2][2][1]) +
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][2], sp13_darr[1][1], sin(2.*b1)*sinh(a1)*sinh(a1), sp13_darr[2][2][1]),  # gd1 b1
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][2], 0.,                           sp12_darr[2][2][2]) +
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][2], sp13_darr[1][2], 0.,                           sp13_darr[2][2][2]),  # gd1 g1
+
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][3], 0.,                           sp12_darr[2][2][3]),  # gd1 a2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][4], 0.,                           sp12_darr[2][2][4]),  # gd1 b2
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][2], sp12_darr[1][5], 0.,                           sp12_darr[2][2][5]),  # gd1 g2
+
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][2], sp13_darr[1][3], 0.,                           sp13_darr[2][2][3]),  # gd1 a3
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][2], sp13_darr[1][4], 0.,                           sp13_darr[2][2][4]),  # gd1 b3
+                da2da1V12(mass_arr[0], sinh(a1)*sinh(a1)*sin(b1)*sin(b1), spring_arr[0][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][2], sp13_darr[1][5], 0.,                           sp13_darr[2][2][5])   # gd1 g3
+            ],
+
+            # ---------- #
+            #     V2     #
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][0], 0., sp12_darr[2][3][0]),  # ad2 a1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][1], 0., sp12_darr[2][3][1]),  # ad2 b1
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][2], 0., sp12_darr[2][3][2]),  # ad2 g1
+
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][3], 0., sp12_darr[2][3][3]) +
+                da2da1V12(mass_arr[1], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][0], sp23_darr[1][0], 0., sp23_darr[2][0][0]),  # ad2 a2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][4], 0., sp12_darr[2][3][4]) +
+                da2da1V12(mass_arr[1], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][0], sp23_darr[1][1], 0., sp23_darr[2][0][1]),  # ad2 b2
+                da2da1V12(mass_arr[1], 1., spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][3], sp12_darr[1][5], 0., sp12_darr[2][3][5]) +
+                da2da1V12(mass_arr[1], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][0], sp23_darr[1][2], 0., sp23_darr[2][0][2]),  # ad2 g2
+
+                da2da1V12(mass_arr[1], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][0], sp23_darr[1][3], 0., sp23_darr[2][0][3]),  # ad2 a3
+                da2da1V12(mass_arr[1], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][0], sp23_darr[1][4], 0., sp23_darr[2][0][4]),  # ad2 b3
+                da2da1V12(mass_arr[1], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][0], sp23_darr[1][5], 0., sp23_darr[2][0][5])   # ad2 g3
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][0], 0.,          sp12_darr[2][4][0]),  # bd2 a1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][1], 0.,          sp12_darr[2][4][1]),  # bd2 b1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][2], 0.,          sp12_darr[2][4][2]),  # bd2 g1
+
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][3], sinh(2.*a2), sp12_darr[2][4][3]) +
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][1], sp23_darr[1][0], sinh(2.*a2), sp23_darr[2][1][0]),  # bd2 a2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][4], 0.,          sp12_darr[2][4][4]) +
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][1], sp23_darr[1][1], 0.,          sp23_darr[2][1][1]),  # bd2 b2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][4], sp12_darr[1][5], 0.,          sp12_darr[2][4][5]) +
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][1], sp23_darr[1][2], 0.,          sp23_darr[2][1][2]),  # bd2 g2
+
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][1], sp23_darr[1][3], 0.,          sp23_darr[2][1][3]),  # bd2 a3
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][1], sp23_darr[1][4], 0.,          sp23_darr[2][1][4]),  # bd2 b3
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][1], sp23_darr[1][5], 0.,          sp23_darr[2][1][5])   # bd2 g3
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][0], 0.,                           sp12_darr[2][5][0]),  # gd2 a1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][1], 0.,                           sp12_darr[2][5][1]),  # gd2 b1
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][2], 0.,                           sp12_darr[2][5][2]),  # gd2 g1
+
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][3], sinh(2.*a2)*sin(b2)*sin(b2),  sp12_darr[2][5][3]) +
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][2], sp23_darr[1][0], sinh(2.*a2)*sin(b2)*sin(b2),  sp23_darr[2][2][0]),  # gd2 a2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][4], sin(2.*b2)*sinh(a2)*sinh(a2), sp12_darr[2][5][4]) +
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][2], sp23_darr[1][1], sin(2.*b2)*sinh(a2)*sinh(a2), sp23_darr[2][2][1]),  # gd2 b2
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[0][0], spring_arr[0][1], sp12_darr[0][0], sp12_darr[1][5], sp12_darr[1][5], 0.,                           sp12_darr[2][5][5]) +
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][2], sp23_darr[1][2], 0.,                           sp23_darr[2][2][2]),  # gd2 g2
+
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][2], sp23_darr[1][3], 0.,                           sp23_darr[2][2][3]),  # gd2 a3
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][2], sp23_darr[1][4], 0.,                           sp23_darr[2][2][4]),  # gd2 b3
+                da2da1V12(mass_arr[1], sinh(a2)*sinh(a2)*sin(b2)*sin(b2), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][2], sp23_darr[1][5], 0.,                           sp23_darr[2][2][5])   # gd2 g3
+            ],
+
+            # ---------- #
+            #     V3     #
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[2], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][3], sp13_darr[1][0], 0., sp13_darr[2][3][0]),  # ad3 a1
+                da2da1V12(mass_arr[2], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][3], sp13_darr[1][1], 0., sp13_darr[2][3][1]),  # ad3 b1
+                da2da1V12(mass_arr[2], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][3], sp13_darr[1][2], 0., sp13_darr[2][3][2]),  # ad3 g1
+
+                da2da1V12(mass_arr[2], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][3], sp23_darr[1][0], 0., sp23_darr[2][3][0]),  # ad3 a2
+                da2da1V12(mass_arr[2], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][3], sp23_darr[1][1], 0., sp23_darr[2][3][1]),  # ad3 b2
+                da2da1V12(mass_arr[2], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][3], sp23_darr[1][2], 0., sp23_darr[2][3][2]),  # ad3 g2
+
+                da2da1V12(mass_arr[2], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][3], sp13_darr[1][3], 0., sp13_darr[2][3][3]) +
+                da2da1V12(mass_arr[2], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][3], sp23_darr[1][3], 0., sp23_darr[2][3][3]),  # ad3 a3
+                da2da1V12(mass_arr[2], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][3], sp13_darr[1][4], 0., sp13_darr[2][3][4]) +
+                da2da1V12(mass_arr[2], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][3], sp23_darr[1][4], 0., sp23_darr[2][3][4]),  # ad3 b3
+                da2da1V12(mass_arr[2], 1., spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][3], sp13_darr[1][5], 0., sp13_darr[2][3][5]) +
+                da2da1V12(mass_arr[2], 1., spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][3], sp23_darr[1][5], 0., sp23_darr[2][3][5])   # ad3 g3
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][4], sp13_darr[1][0], 0.,          sp13_darr[2][4][0]),  # bd3 a1
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][4], sp13_darr[1][1], 0.,          sp13_darr[2][4][1]),  # bd3 b1
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][4], sp13_darr[1][2], 0.,          sp13_darr[2][4][2]),  # bd3 g1
+
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][4], sp23_darr[1][0], 0.,          sp23_darr[2][4][0]),  # bd3 a2
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][4], sp23_darr[1][1], 0.,          sp23_darr[2][4][1]),  # bd3 b2
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][4], sp23_darr[1][2], 0.,          sp23_darr[2][4][2]),  # bd3 g2
+
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][4], sp13_darr[1][3], sinh(2.*a3), sp13_darr[2][4][3]) +
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][4], sp23_darr[1][3], sinh(2.*a3), sp23_darr[2][4][3]),  # bd3 a3
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][4], sp13_darr[1][4], 0.,          sp13_darr[2][4][4]) +
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][4], sp23_darr[1][4], 0.,          sp23_darr[2][4][4]),  # bd3 b3
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][4], sp13_darr[1][5], 0.,          sp13_darr[2][4][5]) +
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][4], sp23_darr[1][5], 0.,          sp23_darr[2][4][5])   # bd3 g3
+            ],
+
+            # ---------- #
+
+            [
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][5], sp13_darr[1][0], 0.,                           sp13_darr[2][5][0]),  # gd3 a1
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][5], sp13_darr[1][1], 0.,                           sp13_darr[2][5][1]),  # gd3 b1
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][5], sp13_darr[1][2], 0.,                           sp13_darr[2][5][2]),  # gd3 g1
+
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][5], sp23_darr[1][0], 0.,                           sp23_darr[2][5][0]),  # gd3 a2
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][5], sp23_darr[1][1], 0.,                           sp23_darr[2][5][1]),  # gd3 b2
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][5], sp23_darr[1][2], 0.,                           sp23_darr[2][5][2]),  # gd3 g2
+
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][5], sp13_darr[1][3], sinh(2.*a3)*sin(b3)*sin(b3),  sp13_darr[2][5][3]) +
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][5], sp23_darr[1][3], sinh(2.*a3)*sin(b3)*sin(b3),  sp23_darr[2][5][2]),  # gd3 a3
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][5], sp13_darr[1][4], sin(2.*b3)*sinh(a3)*sinh(a3), sp13_darr[2][5][4]) +
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][5], sp23_darr[1][4], sin(2.*b3)*sinh(a3)*sinh(a3), sp23_darr[2][5][3]),  # gd3 b3
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[1][0], spring_arr[1][1], sp13_darr[0][0], sp13_darr[1][5], sp13_darr[1][5], 0.,                           sp13_darr[2][5][5]) +
+                da2da1V12(mass_arr[2], sinh(a3)*sinh(a3)*sin(b3)*sin(b3), spring_arr[2][0], spring_arr[2][1], sp23_darr[0][0], sp23_darr[1][5], sp23_darr[1][5], 0.,                           sp23_darr[2][5][5])   # gd3 g3
+            ]
+
+        ])
+
+    # This function is to simplify the following function that generates the square matrix of energy terms for the jacobian
+
+    def jacobi_energy_terms(positions, velocities, mass_arr, spring_arr):
+
+        def derivative_terms(a1, b1, g1, a2, b2, g2):
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12
+                ]
+            ]
+
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        a3,b3,g3=positions[2]
+        ad1,bd1,gd1=velocities[0]
+        ad2,bd2,gd2=velocities[1]
+        ad3,bd3,gd3=velocities[2]
+        ### Spring 1-2 spring_arr[0]###
+        sp12_darr=derivative_terms(a1, b1, g1, a2, b2, g2)
+        ### Spring 1-3 spring_arr[1]###
+        sp13_darr=derivative_terms(a1, b1, g1, a3, b3, g3)
+        ### Spring 2-3 spring_arr[2]###
+        sp23_darr=derivative_terms(a2, b2, g2, a3, b3, g3)
+
+####### @@@@@@@@ HERE WERE I AM ON EDITING. I NEED TO UPDATE THE RETURNED ARRAY TO INCLUDE THE THIRD PARTICLE
+
+        return array([
+            -mass_arr[0]*sinh(a1)*cosh(a1)*( bd1*bd1 + sin(b1)*sin(b1)*gd1*gd1 ) - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][0] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ) - spring_arr[1][0]*( arccosh(sp13_darr[0][0]) - spring_arr[1][1] )*( sp13_darr[1][0] / sqrt(sp13_darr[0][0]*sp13_darr[0][0] - 1.) ),
+            -mass_arr[0]*sin(b1)*cos(b1)*gd1*gd1                                 - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][1] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ) - spring_arr[1][0]*( arccosh(sp13_darr[0][0]) - spring_arr[1][1] )*( sp13_darr[1][1] / sqrt(sp13_darr[0][0]*sp13_darr[0][0] - 1.) ),
+            -mass_arr[0]*0.                                                      - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][2] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ) - spring_arr[1][0]*( arccosh(sp13_darr[0][0]) - spring_arr[1][1] )*( sp13_darr[1][2] / sqrt(sp13_darr[0][0]*sp13_darr[0][0] - 1.) ),
+            -mass_arr[1]*sinh(a2)*cosh(a2)*( bd2*bd2 + sin(b2)*sin(b2)*gd2*gd2 ) - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][3] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ) - spring_arr[2][0]*( arccosh(sp23_darr[0][0]) - spring_arr[2][1] )*( sp23_darr[1][0] / sqrt(sp23_darr[0][0]*sp23_darr[0][0] - 1.) ),
+            -mass_arr[1]*sin(b2)*cos(b2)*gd2*gd2                                 - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][4] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ) - spring_arr[2][0]*( arccosh(sp23_darr[0][0]) - spring_arr[2][1] )*( sp23_darr[1][1] / sqrt(sp23_darr[0][0]*sp23_darr[0][0] - 1.) ),
+            -mass_arr[1]*0.                                                      - spring_arr[0][0]*( arccosh(sp12_darr[0][0]) - spring_arr[0][1] )*( sp12_darr[1][5] / sqrt(sp12_darr[0][0]*sp12_darr[0][0] - 1.) ) - spring_arr[2][0]*( arccosh(sp23_darr[0][0]) - spring_arr[2][1] )*( sp23_darr[1][2] / sqrt(sp23_darr[0][0]*sp23_darr[0][0] - 1.) ),
+            -mass_arr[2]*sinh(a3)*cosh(a3)*( bd3*bd3 + sin(b3)*sin(b3)*gd3*gd3 ) - spring_arr[1][0]*( arccosh(sp13_darr[0][0]) - spring_arr[1][1] )*( sp13_darr[1][3] / sqrt(sp13_darr[0][0]*sp13_darr[0][0] - 1.) ) - spring_arr[2][0]*( arccosh(sp23_darr[0][0]) - spring_arr[2][1] )*( sp23_darr[1][3] / sqrt(sp23_darr[0][0]*sp23_darr[0][0] - 1.) ),
+            -mass_arr[2]*sin(b3)*cos(b3)*gd3*gd3                                 - spring_arr[1][0]*( arccosh(sp13_darr[0][0]) - spring_arr[1][1] )*( sp13_darr[1][4] / sqrt(sp13_darr[0][0]*sp13_darr[0][0] - 1.) ) - spring_arr[2][0]*( arccosh(sp23_darr[0][0]) - spring_arr[2][1] )*( sp23_darr[1][4] / sqrt(sp23_darr[0][0]*sp23_darr[0][0] - 1.) ),
+            -mass_arr[2]*0.                                                      - spring_arr[1][0]*( arccosh(sp13_darr[0][0]) - spring_arr[1][1] )*( sp13_darr[1][5] / sqrt(sp13_darr[0][0]*sp13_darr[0][0] - 1.) ) - spring_arr[2][0]*( arccosh(sp23_darr[0][0]) - spring_arr[2][1] )*( sp23_darr[1][5] / sqrt(sp23_darr[0][0]*sp23_darr[0][0] - 1.) ),
+            -mass_arr[0]*ad1,
+            -mass_arr[0]*sinh(a1)*sinh(a1)*bd1,
+            -mass_arr[0]*sin(b1)*sin(b1)*gd1,
+            -mass_arr[1]*ad2,
+            -mass_arr[1]*sinh(a2)*sinh(a2)*bd2,
+            -mass_arr[1]*sin(b2)*sin(b2)*gd2,
+            -mass_arr[2]*ad3,
+            -mass_arr[2]*sinh(a3)*sinh(a3)*bd3,
+            -mass_arr[2]*sin(b3)*sin(b3)*gd3
+        ])
+
+
+   
+    def con1(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return an1 - an - .5*h*(adn + adn1)
+
+    def con2(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h):
+        return bn1 - bn - .5*h*(bdn + bdn1)
+
+    def con3(an, an1, bn, bn1, gn, gn1, adn, adn1, bdn, bdn1, gdn, gdn1, h): 
+        return gn1 - gn - .5*h*(gdn + gdn1)        
+
+    def con4(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, spoke2_pos, spoke2_pos_guess, base_vel, base_vel_guess, m1, h, sp12, sp13):
+        def geo_spring_term_ad(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*1.)*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.))
+
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        a3n,b3n,g3n=spoke2_pos
+        a3n1,b3n1,g3n1=spoke2_pos_guess
+        return (ad1n1 - ad1n - .5*h*(
+            (bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n) + geo_spring_term_ad(a1n, b1n, g1n, a2n, b2n, g2n, m1, sp12) + geo_spring_term_ad(a1n, b1n, g1n, a3n, b3n, g3n, m1, sp13)
+            + 
+            (bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1) + geo_spring_term_ad(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, sp12) + geo_spring_term_ad(a1n1, b1n1, g1n1, a3n1, b3n1, g3n1, m1, sp13)
+            ))
+
+    def con5(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, spoke2_pos, spoke2_pos_guess, base_vel, base_vel_guess, m1, h, sp12, sp13):
+        def geo_spring_term_bd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        a3n,b3n,g3n=spoke2_pos
+        a3n1,b3n1,g3n1=spoke2_pos_guess
+        return (bd1n1 - bd1n - .5*h*(
+            gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n) + geo_spring_term_bd(a1n, b1n, g1n, a2n, b2n, g2n, m1, sp12) + geo_spring_term_bd(a1n, b1n, g1n, a3n, b3n, g3n, m1, sp13)
+            + 
+            gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1) + geo_spring_term_bd(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, sp12) + geo_spring_term_bd(a1n1, b1n1, g1n1, a3n1, b3n1, g3n1, m1, sp13)
+            ))
+
+    def con6(base_pos, base_pos_guess, spoke1_pos, spoke1_pos_guess, spoke2_pos, spoke2_pos_guess, base_vel, base_vel_guess, m1, h, sp12, sp13):
+        def geo_spring_term_gd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1)*sin(b1)*sin(b1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        a2n,b2n,g2n=spoke1_pos
+        a2n1,b2n1,g2n1=spoke1_pos_guess
+        a3n,b3n,g3n=spoke2_pos
+        a3n1,b3n1,g3n1=spoke2_pos_guess
+        return (gd1n1 - gd1n - .5*h*(
+            -2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n) + geo_spring_term_gd(a1n, b1n, g1n, a2n, b2n, g2n, m1, sp12) + geo_spring_term_gd(a1n, b1n, g1n, a3n, b3n, g3n, m1, sp13)
+            + 
+            -2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1) + geo_spring_term_gd(a1n1, b1n1, g1n1, a2n1, b2n1, g2n1, m1, sp12) + geo_spring_term_gd(a1n1, b1n1, g1n1, a3n1, b3n1, g3n1, m1, sp13)
+            ))
+    
+    def con7(positions, velocities, mass_arr, spring_arr, energy):
+        a1,b1,g1=positions[0]
+        a2,b2,g2=positions[1]
+        a3,b3,g3=positions[2]
+        ad1,bd1,gd1=velocities[0]
+        ad2,bd2,gd2=velocities[1]
+        ad3,bd3,gd3=velocities[2]
+        d12=cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+        d13=cosh(a1)*cosh(a3) - sinh(a1)*cos(b1)*sinh(a3)*cos(b3) - sinh(a1)*sin(b1)*sinh(a3)*sin(b3)*cos(g1 - g3)
+        d23=cosh(a2)*cosh(a3) - sinh(a2)*cos(b2)*sinh(a3)*cos(b3) - sinh(a2)*sin(b2)*sinh(a3)*sin(b3)*cos(g2 - g3)
+
+        return (energy -
+            .5*mass_arr[0]*( ad1*ad1 + sinh(a1)*sinh(a1)*bd1*bd1 + sinh(a1)*sinh(a1)*sin(b1)*sin(b1)*gd1*gd1 ) - 
+            .5*mass_arr[1]*( ad2*ad2 + sinh(a2)*sinh(a2)*bd2*bd2 + sinh(a2)*sinh(a2)*sin(b2)*sin(b2)*gd2*gd2 ) -
+            .5*mass_arr[2]*( ad3*ad3 + sinh(a3)*sinh(a3)*bd3*bd3 + sinh(a3)*sinh(a3)*sin(b3)*sin(b3)*gd3*gd3 ) -
+            .5*spring_arr[0][0]*( arccosh(d12) - spring_arr[0][1] )**2. -
+            .5*spring_arr[1][0]*( arccosh(d13) - spring_arr[1][1] )**2. -
+            .5*spring_arr[2][0]*( arccosh(d23) - spring_arr[2][1] )**2.
+            )
+
+
+    
+    def jacobian(positions, velocities, mass_arr, h, spring_arr):
+        def geo_term_arr(a1, b1, g1, ad1, bd1, gd1, h):
+            return [
+                [   # a1, b1, g1 derivatives of adn1 update constraint
+                    -.5*h*(bd1*bd1+sin(b1)*sin(b1)*gd1*gd1)*cosh(2.*a1),
+                    -.25*h*sinh(2.*a1)*sin(2.*b1)*gd1*gd1,
+                    0,
+                ],
+                [   # a1, b1, g1 derivatives of bdn1 update constraint
+                    -h*ad1*bd1/(sinh(a1)*sinh(a1)),
+                    -.5*h*cos(2.*b1)*gd1*gd1,
+                    0.
+                ],
+                [   # a1, b1, g1 derivatives of gdn1 update constraint
+                    -h*ad1*gd1/(sinh(a1)*sinh(a1)),
+                    -h*bd1*gd1/(sin(b1)*sin(b1)),
+                    0.
+                ],
+                [   # ad1, bd1, gd1 derivatives of adn1 update constraint
+                    1.,
+                    -.5*h*sinh(2.*a1)*bd1,
+                    -.5*h*sinh(2.*a1)*sin(b1)*sin(b1)*gd1
+                ],
+                [   # ad1, bd1, gd1 derivatives of bdn1 update constraint
+                    h/tanh(a1)*bd1,
+                    1.+h/tanh(a1)*ad1,
+                    -.5*h*sin(2.*b1)*gd1
+                ],
+                [   # ad1, bd1, gd1 derivatives of gdn1 update constraint
+                    h/tanh(a1)*gd1,
+                    h/tan(b1)*gd1,
+                    1.+h/tanh(a1)*ad1+h/tan(b1)*bd1
+                ]
+            ]
+
+        a1n1,b1n1,g1n1=positions[0]
+        a2n1,b2n1,g2n1=positions[1]
+        a3n1,b3n1,g3n1=positions[2]
+        ad1n1,bd1n1,gd1n1=velocities[0]
+        ad2n1,bd2n1,gd2n1=velocities[1]
+        ad3n1,bd3n1,gd3n1=velocities[2]
+        spring_terms=jacobi_sp_terms(positions, mass_arr, spring_arr)
+        energy_terms=jacobi_energy_terms(positions, velocities, mass_arr, spring_arr)
+        geo_term_p1=geo_term_arr(a1n1, b1n1, g1n1, ad1n1, bd1n1, gd1n1, h)
+        geo_term_p2=geo_term_arr(a2n1, b2n1, g2n1, ad2n1, bd2n1, gd2n1, h)
+        geo_term_p3=geo_term_arr(a3n1, b3n1, g3n1, ad3n1, bd3n1, gd3n1, h)
+        #print(spring_terms)
+        return array([
+            [1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0., 0.,0.,0., 0.],
+            [0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0., 0.,0.,0., 0.],
+            [0.,0.,1., 0.,0.,0., 0.,0.,0., 0.,0.,-.5*h, 0.,0.,0., 0.,0.,0., 0.],
+
+            [0.,0.,0., 1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0., 0.],
+            [0.,0.,0., 0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0., 0.,0.,0., 0.],
+            [0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,0., 0.,0.,-.5*h, 0.,0.,0., 0.],
+
+            [0.,0.,0., 0.,0.,0., 1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.],
+            [0.,0.,0., 0.,0.,0., 0.,1.,0., 0.,0.,0., 0.,0.,0., 0.,-.5*h,0., 0.],
+            [0.,0.,0., 0.,0.,0., 0.,0.,1., 0.,0.,0., 0.,0.,0., 0.,0.,-.5*h, 0.],
+
+            # ad1 update
+            [
+                geo_term_p1[0][0] + spring_terms[0][0],
+                geo_term_p1[0][1] + spring_terms[0][1],
+                geo_term_p1[0][2] + spring_terms[0][2], 
+            
+                spring_terms[0][3],
+                spring_terms[0][4],
+                spring_terms[0][5],
+
+                spring_terms[0][6],
+                spring_terms[0][7],
+                spring_terms[0][8],
+
+                geo_term_p1[3][0],
+                geo_term_p1[3][1],
+                geo_term_p1[3][2],
+
+                0.,0.,0., 0.,0.,0., 0.
+            ],
+
+            # bd1 update
+            [
+                geo_term_p1[1][0] + spring_terms[1][0],
+                geo_term_p1[1][1] + spring_terms[1][1],
+                geo_term_p1[1][2] + spring_terms[1][2], 
+
+                spring_terms[1][3],
+                spring_terms[1][4],
+                spring_terms[1][5],
+
+                spring_terms[1][6],
+                spring_terms[1][7],
+                spring_terms[1][8],
+
+                geo_term_p1[4][0],
+                geo_term_p1[4][1],
+                geo_term_p1[4][2],
+
+                0.,0.,0., 0.,0.,0., 0.
+            ],
+
+            # gd1 update
+            [
+                geo_term_p1[2][0] + spring_terms[2][0],
+                geo_term_p1[2][1] + spring_terms[2][1],
+                geo_term_p1[2][2] + spring_terms[2][2],
+
+                spring_terms[2][3],
+                spring_terms[2][4],
+                spring_terms[2][5],
+
+                spring_terms[2][6],
+                spring_terms[2][7],
+                spring_terms[2][8],
+
+                geo_term_p1[5][0],
+                geo_term_p1[5][1],
+                geo_term_p1[5][2],
+
+                0.,0.,0., 0.,0.,0., 0.
+            ],
+
+            # ad2 update
+            [
+                spring_terms[3][0],
+                spring_terms[3][1],
+                spring_terms[3][2],
+
+                geo_term_p2[0][0] + spring_terms[3][3],
+                geo_term_p2[0][1] + spring_terms[3][4],
+                geo_term_p2[0][2] + spring_terms[3][5],
+
+                spring_terms[3][6],
+                spring_terms[3][7],
+                spring_terms[3][8],
+
+                0.,0.,0.,
+
+                geo_term_p2[3][0],
+                geo_term_p2[3][1],
+                geo_term_p2[3][2],
+
+                0.,0.,0., 0.
+            ],
+
+            # bd2 update
+            [
+                spring_terms[4][0],
+                spring_terms[4][1],
+                spring_terms[4][2],
+
+                geo_term_p2[1][0] + spring_terms[4][3],
+                geo_term_p2[1][1] + spring_terms[4][4],
+                geo_term_p2[1][2] + spring_terms[4][5],
+
+                spring_terms[4][6],
+                spring_terms[4][7],
+                spring_terms[4][8],
+
+                0.,0.,0.,
+
+                geo_term_p2[4][0],
+                geo_term_p2[4][1],
+                geo_term_p2[4][2],
+                
+                0.,0.,0., 0.
+            ],
+
+            # gd2 update
+            [
+                spring_terms[5][0],
+                spring_terms[5][1],
+                spring_terms[5][2],
+
+                geo_term_p2[2][0] + spring_terms[5][3],
+                geo_term_p2[2][1] + spring_terms[5][4],
+                geo_term_p2[2][2] + spring_terms[5][5],
+
+                spring_terms[5][6],
+                spring_terms[5][7],
+                spring_terms[5][8],
+
+                0.,0.,0.,
+
+                geo_term_p2[5][0],
+                geo_term_p2[5][1],
+                geo_term_p2[5][2],
+                
+                0.,0.,0., 0.
+            ],
+
+            # ad3 update
+            [
+                spring_terms[6][0],
+                spring_terms[6][1],
+                spring_terms[6][2],
+
+                spring_terms[6][3],
+                spring_terms[6][4],
+                spring_terms[6][5],
+
+                geo_term_p3[0][0] + spring_terms[6][6],
+                geo_term_p3[0][1] + spring_terms[6][7],
+                geo_term_p3[0][2] + spring_terms[6][8],
+
+                0.,0.,0., 0.,0.,0.,
+
+                geo_term_p3[3][0],
+                geo_term_p3[3][1],
+                geo_term_p3[3][2], 0.
+            ],
+
+            # bd3 update
+            [
+                spring_terms[7][0],
+                spring_terms[7][1],
+                spring_terms[7][2],
+
+                spring_terms[7][3],
+                spring_terms[7][4],
+                spring_terms[7][5],
+
+                geo_term_p3[1][0] + spring_terms[7][6],
+                geo_term_p3[1][1] + spring_terms[7][7],
+                geo_term_p3[1][2] + spring_terms[7][8],
+
+                0.,0.,0., 0.,0.,0.,
+
+                geo_term_p3[4][0],
+                geo_term_p3[4][1],
+                geo_term_p3[4][2], 0.
+            ],
+
+            # gd3 update
+            [
+                spring_terms[8][0],
+                spring_terms[8][1],
+                spring_terms[8][2],
+
+                spring_terms[8][3],
+                spring_terms[8][4],
+                spring_terms[8][5],
+
+                geo_term_p3[2][0] + spring_terms[8][6],
+                geo_term_p3[2][1] + spring_terms[8][7],
+                geo_term_p3[2][2] + spring_terms[8][8],
+
+                0.,0.,0., 0.,0.,0.,
+
+                geo_term_p3[5][0],
+                geo_term_p3[5][1],
+                geo_term_p3[5][2], 0.
+            ],
+
+            # energy conservation
+            [
+                energy_terms[0],
+                energy_terms[1],
+                energy_terms[2],
+                energy_terms[3],
+                energy_terms[4],
+                energy_terms[5],
+                energy_terms[6],
+                energy_terms[7],
+                energy_terms[8],
+                energy_terms[9],
+                energy_terms[10],
+                energy_terms[11],
+                energy_terms[12],
+                energy_terms[13],
+                energy_terms[14],
+                energy_terms[15],
+                energy_terms[16],
+                energy_terms[17], 1.
+            ]
+        ])
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    diff1=linalg.solve(jacobian(posn_arr, veln_arr, mass_arr, step, spring_arr),-array([
+        #p1
+        con1(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con2(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con3(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        #p2
+        con1(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con2(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con3(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        #p3
+        con1(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+        con2(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+        con3(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+
+        #v1
+        con4(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        con5(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        con6(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        #v2
+        con4(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        con5(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        con6(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        #v3
+        con4(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+        con5(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+        con6(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+
+        #energy
+        con7(posn_arr, veln_arr, mass_arr, spring_arr, energy)    
+    ]))
+    val1 = array([
+            posn_arr[0][0]+diff1[0], posn_arr[0][1]+diff1[1], posn_arr[0][2]+diff1[2], 
+            posn_arr[1][0]+diff1[3], posn_arr[1][1]+diff1[4], posn_arr[1][2]+diff1[5], 
+            posn_arr[2][0]+diff1[6], posn_arr[2][1]+diff1[7], posn_arr[2][2]+diff1[8],
+
+            veln_arr[0][0]+diff1[9], veln_arr[0][1]+diff1[10], veln_arr[0][2]+diff1[11], 
+            veln_arr[1][0]+diff1[12], veln_arr[1][1]+diff1[13], veln_arr[1][2]+diff1[14], 
+            veln_arr[2][0]+diff1[15], veln_arr[2][1]+diff1[16], veln_arr[2][2]+diff1[17],
+
+            energy+diff1[18]
+            ])    
+    x = 0
+    while(x < 7):
+        new_pos_arr=array([val1[0:3],val1[3:6],val1[6:9]])
+        new_vel_arr=array([val1[9:12],val1[12:15],val1[15:18]])
+        new_energy=val1[18]
+        diff2=linalg.solve(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr),-array([
+            #p1
+            con1(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con2(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con3(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            #p2
+            con1(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con2(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con3(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            #p3
+            con1(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+            con2(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+            con3(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+
+            #v1
+            con4(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            con5(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            con6(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            #v2
+            con4(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con5(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con6(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            #v3
+            con4(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con5(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con6(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+
+            #energy 
+            con7(new_pos_arr, new_vel_arr, mass_arr, spring_arr, new_energy)
+        ]))      
+        val2 = array([
+            val1[0]+diff2[0], val1[1]+diff2[1], val1[2]+diff2[2], 
+            val1[3]+diff2[3], val1[4]+diff2[4], val1[5]+diff2[5],
+            val1[6]+diff2[6], val1[7]+diff2[7], val1[8]+diff2[8],
+
+            val1[9]+diff2[9], val1[10]+diff2[10], val1[11]+diff2[11],
+            val1[12]+diff2[12], val1[13]+diff2[13], val1[14]+diff2[14],
+            val1[15]+diff2[15], val1[16]+diff2[16], val1[17]+diff2[17],
+
+            val1[18]+diff2[18]
+            ])
+        val1 = val2
+        x=x+1
+    #print(val1[9:17])
+    return val1
+
+def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_list):
+
+    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
+    # I have found that I do not need to make functions for both particles since I can just flip the arguments
+    # and it should work fine since they are symmetric. In principle, I think that I do not need to generate
+    # any new functions for this system. I just have to be careful with the arguments I use in the functions.
+    # In spring terms are more numerous given that each particle is connected to three other particles. When 
+    # using the below functions the more general notation of Dmn just needs to be considered with 1=m and 2=n.
+    # This is so I do not introduce any unintended errors by changing the variables.
+
+    # This is the argument inside the arccosh of the distance function. It is the same for both particles
+    # due to the symmetric of the equation between particle 1 and 2. This can be used as a general function
+    # I just have to be careful about the arguments for the various particle pairs.
+    def D12(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only three functions are needed instead of six.
+    
+    # For the remaining three functions use:
+    # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
+    # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
+    # dg2D12 = dg1D12(a2, b2, g2, a1, b1, g1)
+    def da1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2) 
+
+    def dg1D12(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)      
+    
+
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
+    # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
+    # with the arguments flipped. Thus only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
+    # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
+    # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
+    
+    # For the remaining nine functions of the upper triangular matrix use:
+    # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+
+    # da2D12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+    # db2D12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+    # dg2D12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+    # db2D12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+    # dg2D12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+    # dg2D12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+
+    # For the remaining lower portion of the total square matrix of terms (fifteen values) simply interchange the indices of 
+    # the partial derivatives.
+    def da1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*cos(b2) - cosh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def da2D12a1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sinh(a2) - cosh(a1)*cos(b1)*cosh(a2)*cos(b2) - cosh(a1)*sin(b1)*cosh(a2)*sin(b2)*cos(g1 - g2)
+
+    def db2D12a1(a1, b1, g1, a2, b2, g2):
+        return cosh(a1)*cos(b1)*sinh(a2)*sin(b2) - cosh(a1)*sin(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12a1(a1, b1, g1, a2, b2, g2):
+        return -cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*cos(b2) + sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg1D12b1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def db2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2)*cos(g1 - g2)
+
+    def dg2D12b1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)
+
+    def dg1D12g1(a1, b1, g1, a2, b2, g2):
+        return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    def dg2D12g1(a1, b1, g1, a2, b2, g2):
+        return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
+
+    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
+    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
+    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
+    # included in the bottom left block of the complete jacobian.
+
+    def jacobi_sp_terms(mesh, mass_arr, spring_arr):
+
+        def da2da1V12(m, f, sp_dat, d12, da1d12, da2d12, df, da2d12da1):
+            return -sp_dat[0]/(m*f*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) + ( arccosh(d12) - sp_dat[1] )*( da2d12da1 - da1d12*(df/f + d12*da2d12/(d12**2. - 1.)) ) )
+
+        def derivative_terms(part1,part2):
+            a1, b1, g1=part1
+            a2, b2, g2=part2
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            # Second derivatives of D function
+            da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
+            db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
+            dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
+            da2d12a1=da2D12a1(a1, b1, g1, a2, b2, g2)
+            db2d12a1=db2D12a1(a1, b1, g1, a2, b2, g2)
+            dg2d12a1=dg2D12a1(a1, b1, g1, a2, b2, g2)
+            
+            da1d12b1=db1d12a1
+            db1d12b1=db1D12b1(a1, b1, g1, a2, b2, g2)
+            dg1d12b1=dg1D12b1(a1, b1, g1, a2, b2, g2)
+            da2d12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12b1=db2D12b1(a1, b1, g1, a2, b2, g2)
+            dg2d12b1=dg2D12b1(a1, b1, g1, a2, b2, g2)
+
+            da1d12g1=dg1d12a1
+            db1d12g1=dg1d12b1
+            dg1d12g1=dg1D12g1(a1, b1, g1, a2, b2, g2)
+            da2d12g1 = dg2D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12g1 = dg2D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12g1=dg2D12g1(a1, b1, g1, a2, b2, g2)
+
+            da1d12a2=da2d12a1
+            db1d12a2=da2d12b1
+            dg1d12a2=da2d12g1
+            da2d12a2 = da1D12a1(a2, b2, g2, a1, b1, g1)
+            db2d12a2 = db1D12a1(a2, b2, g2, a1, b1, g1)
+            dg2d12a2 = dg1D12a1(a2, b2, g2, a1, b1, g1)
+
+            da1d12b2=db2d12a1
+            db1d12b2=db2d12b1
+            dg1d12b2=db2d12g1
+            da2d12b2=db2d12a2
+            db2d12b2 = db1D12b1(a2, b2, g2, a1, b1, g1)
+            dg2d12b2 = dg1D12b1(a2, b2, g2, a1, b1, g1)
+
+            da1d12g2=dg2d12a1
+            db1d12g2=dg2d12b1
+            dg1d12g2=dg2d12g1
+            da2d12g2=dg2d12a2
+            db2d12g2=dg2d12b2
+            dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12],
+                [ # Second derivatives of D function
+                    [
+                        da1d12a1,
+                        db1d12a1,
+                        dg1d12a1,
+                        da2d12a1,
+                        db2d12a1,
+                        dg2d12a1
+                    ],
+                    [
+                        da1d12b1,
+                        db1d12b1,
+                        dg1d12b1,
+                        da2d12b1,
+                        db2d12b1,
+                        dg2d12b1
+                    ],
+                    [
+                        da1d12g1,
+                        db1d12g1,
+                        dg1d12g1,
+                        da2d12g1,
+                        db2d12g1,
+                        dg2d12g1
+                    ],
+                    [
+                        da1d12a2,
+                        db1d12a2,
+                        dg1d12a2,
+                        da2d12a2,
+                        db2d12a2,
+                        dg2d12a2
+                    ],
+                    [
+                        da1d12b2,
+                        db1d12b2,
+                        dg1d12b2,
+                        da2d12b2,
+                        db2d12b2,
+                        dg2d12b2
+                    ],
+                    [
+                        da1d12g2,
+                        db1d12g2,
+                        dg1d12g2,
+                        da2d12g2,
+                        db2d12g2,
+                        dg2d12g2
+                    ],
+                ]
+            ]
+
+        spring_data=[]
+
+        for a in mesh[1]:
+            spring_data.append(derivative_terms(mesh[0][a[0]],mesh[0][a[1]]))
+        
+        # ### Spring 1-2 spring_arr[0]###
+        # sp12_darr=derivative_terms(positions[0],positions[1])
+        # ### Spring 1-3 spring_arr[1]###
+        # sp13_darr=derivative_terms(positions[0],positions[2])
+        # ### Spring 2-3 spring_arr[2]###
+        # sp23_darr=derivative_terms(positions[1],positions[2])
+
+        spring_matrix=[]
+        for b in range(3*len(mesh[0])):
+            for c in range(3*len(mesh[0])):
+                spring_matrix.append([])
+
+        sp_count=0
+
+        for b in mesh[1]:
+            spring_matrix[3*b[0]+0][3*b[0]+0]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][0], 0., spring_data[sp_count][2][0][0])
+            spring_matrix[3*b[0]+0][3*b[0]+1]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][1], 0., spring_data[sp_count][2][0][1])
+            spring_matrix[3*b[0]+0][3*b[0]+2]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][2], 0., spring_data[sp_count][2][0][2])
+
+            spring_matrix[3*b[0]+1][3*b[0]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][1], spring_data[sp_count][1][0], sinh(2.*mesh[0][b[0]][0]), spring_data[sp_count][2][1][0])
+            spring_matrix[3*b[0]+1][3*b[0]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][1], spring_data[sp_count][1][1], 0.,                        spring_data[sp_count][2][1][1])
+            spring_matrix[3*b[0]+1][3*b[0]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][1], spring_data[sp_count][1][2], 0.,                        spring_data[sp_count][2][1][2])
+
+            spring_matrix[3*b[0]+2][3*b[0]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][0], sinh(2.*mesh[0][b[0]][0])*sin(mesh[0][b[0]][1])**2., spring_data[sp_count][2][2][0])
+            spring_matrix[3*b[0]+2][3*b[0]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][1], sin(2.*mesh[0][b[0]][1])*sinh(mesh[0][b[0]][0])**2., spring_data[sp_count][2][2][1])
+            spring_matrix[3*b[0]+2][3*b[0]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][2], 0.,                                                  spring_data[sp_count][2][2][2])
+
+
+            spring_matrix[3*b[0]+0][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][3][3])
+            spring_matrix[3*b[0]+0][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][3][4])
+            spring_matrix[3*b[0]+0][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][3][5])
+
+            spring_matrix[3*b[0]+1][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][4][3])
+            spring_matrix[3*b[0]+1][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][4][4])
+            spring_matrix[3*b[0]+1][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][4][5])
+
+            spring_matrix[3*b[0]+2][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][5][3])
+            spring_matrix[3*b[0]+2][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][5][4])
+            spring_matrix[3*b[0]+2][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][5][5])
+
+
+            spring_matrix[3*b[1]+0][3*b[0]+0]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][0], 0., spring_data[sp_count][2][3][0])
+            spring_matrix[3*b[1]+0][3*b[0]+1]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][1], 0., spring_data[sp_count][2][3][1])
+            spring_matrix[3*b[1]+0][3*b[0]+2]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][2], 0., spring_data[sp_count][2][3][2])
+
+            spring_matrix[3*b[1]+1][3*b[0]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][0], 0., spring_data[sp_count][2][4][0])
+            spring_matrix[3*b[1]+1][3*b[0]+1]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][1], 0., spring_data[sp_count][2][4][1])
+            spring_matrix[3*b[1]+1][3*b[0]+2]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][2], 0., spring_data[sp_count][2][4][2])
+
+            spring_matrix[3*b[1]+2][3*b[0]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][0], 0., spring_data[sp_count][2][5][0])
+            spring_matrix[3*b[1]+2][3*b[0]+1]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][1], 0., spring_data[sp_count][2][5][1])
+            spring_matrix[3*b[1]+2][3*b[0]+2]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][2], 0., spring_data[sp_count][2][5][2])
+
+
+            spring_matrix[3*b[1]+0][3*b[1]+0]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][3][3])
+            spring_matrix[3*b[1]+0][3*b[1]+1]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][3][4])
+            spring_matrix[3*b[1]+0][3*b[1]+2]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][3][5])
+
+            spring_matrix[3*b[1]+1][3*b[1]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][3], sinh(2.*mesh[0][b[0]][0]), spring_data[sp_count][2][4][3])
+            spring_matrix[3*b[1]+1][3*b[1]+1]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][4], 0.,                        spring_data[sp_count][2][4][4])
+            spring_matrix[3*b[1]+1][3*b[1]+2]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][5], 0.,                        spring_data[sp_count][2][4][5])
+
+            spring_matrix[3*b[1]+2][3*b[1]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][3], sinh(2.*mesh[0][b[1]][0])*sin(mesh[0][b[1]][1])**2., spring_data[sp_count][2][5][3])
+            spring_matrix[3*b[1]+2][3*b[1]+1]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][4], sin(2.*mesh[0][b[1]][1])*sinh(mesh[0][b[1]][0])**2., spring_data[sp_count][2][5][4])
+            spring_matrix[3*b[1]+2][3*b[1]+2]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][5], 0.,                                                  spring_data[sp_count][2][5][5])
+
+            sp_count+=1
+
+
+
+        
+
+        return spring_matrix
+
+    # This function is to simplify the following function that generates the square matrix of energy terms for the jacobian
+
+    def jacobi_energy_terms(mesh, velocities, mass_arr, spring_arr):
+
+        def derivative_terms(part1,part2):
+            a1, b1, g1=part1
+            a2, b2, g2=part2
+            # D function
+            d12=D12(a1, b1, g1, a2, b2, g2)
+            # First derivatives of D function
+            da1d12=da1D12(a1, b1, g1, a2, b2, g2)
+            db1d12=db1D12(a1, b1, g1, a2, b2, g2)
+            dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
+            da2d12=da1D12(a2, b2, g2, a1, b1, g1)
+            db2d12=db1D12(a2, b2, g2, a1, b1, g1)
+            dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
+            return [
+                [ # D function
+                    d12
+                ],
+                [ # First derivatives of D function
+                    da1d12, 
+                    db1d12, 
+                    dg1d12, 
+                    da2d12, 
+                    db2d12, 
+                    dg2d12
+                ]
+            ]
+
+        spring_data=[]
+        print(mesh)
+
+        for a in mesh[1]:
+            print(a)
+            spring_data.append(derivative_terms(mesh[0][a[0]],mesh[0][a[1]]))
+        
+        # ### Spring 1-2 spring_arr[0]###
+        # sp12_darr=derivative_terms(positions[0],positions[1])
+        # ### Spring 1-3 spring_arr[1]###
+        # sp13_darr=derivative_terms(positions[0],positions[2])
+        # ### Spring 2-3 spring_arr[2]###
+        # sp23_darr=derivative_terms(positions[1],positions[2])
+
+        energy_vector=[]
+        for c in range(3*2*len(mesh[0])):
+                energy_vector.append([])
+
+        for b in range(len(mesh[0])):
+            # position terms (kinetic energy)
+            energy_vector[3*b+0]-=mass_arr[b]*sinh(mesh[0][b][0])*cosh(mesh[0][b][0])*( velocities[b][1]**2. + sin(mesh[0][b][1])**2.*velocities[b][2]**2. )
+            energy_vector[3*b+1]-=mass_arr[b]*sin(mesh[0][b][1])*cos(mesh[0][b][1])*velocities[b][2]**2.
+            energy_vector[3*b+2]-=mass_arr[b]*0. 
+
+            # position terms (potential energy)
+            for c in mesh[1]:
+                if b in c:
+                    spring_index=mesh[1].index(c)
+                    if c.index(b)==0:
+                        energy_vector[3*b+0]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][0] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
+                        energy_vector[3*b+1]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][1] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
+                        energy_vector[3*b+2]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][2] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
+                    elif c.index(b)==1:
+                        energy_vector[3*b+0]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][3] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
+                        energy_vector[3*b+1]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][4] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
+                        energy_vector[3*b+2]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][5] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
+
+            # velocity terms
+            energy_vector[3*(b+len(mesh[0]))+0]-=mass_arr[b]*velocities[b][0]
+            energy_vector[3*(b+len(mesh[0]))+1]-=mass_arr[b]*sinh(mesh[0][b][0])**2.*velocities[b][1]
+            energy_vector[3*(b+len(mesh[0]))+2]-=mass_arr[b]*sin(mesh[0][b][1])**2.*velocities[b][2]
+
+        return energy_vector
+
+
+   
+    def con1(base_pos, base_pos_guess, base_vel, base_vel_guess, h):
+        an,bn,gn=base_pos
+        an1,bn1,gn1=base_pos_guess
+        adn,bdn,gdn=base_vel
+        adn1,bdn1,gdn1=base_vel_guess
+        return an1 - an - .5*h*(adn + adn1)
+
+    def con2(base_pos, base_pos_guess, base_vel, base_vel_guess, h):
+        an,bn,gn=base_pos
+        an1,bn1,gn1=base_pos_guess
+        adn,bdn,gdn=base_vel
+        adn1,bdn1,gdn1=base_vel_guess
+        return bn1 - bn - .5*h*(bdn + bdn1)
+
+    def con3(base_pos, base_pos_guess, base_vel, base_vel_guess, h): 
+        an,bn,gn=base_pos
+        an1,bn1,gn1=base_pos_guess
+        adn,bdn,gdn=base_vel
+        adn1,bdn1,gdn1=base_vel_guess
+        return gn1 - gn - .5*h*(gdn + gdn1)        
+
+    def con4(base_pos, base_pos_guess, spokes_pos_list, spokes_pos_list_guess, base_vel, base_vel_guess, m1, h, sp_arr):
+        def geo_spring_term_ad(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*1.)*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.))
+
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        nval=(bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n)
+        n1val=(bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1)
+
+        for a in spokes_pos_list:
+            axn,bxn,gxn=mesh[0][a[0]]
+            nval+=geo_spring_term_ad(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
+
+        for b in spokes_pos_list_guess:
+            axn1,bxn1,gxn1=mesh[0][a[0]]
+            n1val+=geo_spring_term_ad(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
+
+        return (ad1n1 - ad1n - .5*h*(nval+n1val))
+
+    def con5(base_pos, base_pos_guess, spokes_pos_list, spokes_pos_list_guess, base_vel, base_vel_guess, m1, h, sp_arr):
+        def geo_spring_term_bd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        nval=gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n)
+        n1val=gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1)
+
+        for a in spokes_pos_list:
+            axn,bxn,gxn=mesh[0][a[0]]
+            nval+=geo_spring_term_bd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
+
+        for b in spokes_pos_list_guess:
+            axn1,bxn1,gxn1=mesh[0][a[0]]
+            n1val+=geo_spring_term_bd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
+
+        return (bd1n1 - bd1n - .5*h*(nval+n1val))
+
+    def con6(base_pos, base_pos_guess, spokes_pos_list, spokes_pos_list_guess, base_vel, base_vel_guess, m1, h, sp_arr):
+        def geo_spring_term_gd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1)*sin(b1)*sin(b1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        nval=-2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n)
+        n1val=-2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1)
+
+        for a in spokes_pos_list:
+            axn,bxn,gxn=mesh[0][a[0]]
+            nval+=geo_spring_term_gd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
+
+        for b in spokes_pos_list_guess:
+            axn1,bxn1,gxn1=mesh[0][a[0]]
+            n1val+=geo_spring_term_gd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
+
+        return (gd1n1 - gd1n - .5*h*(nval+n1val))
+    
+    def con7(positions, velocities, mass_arr, spring_arr, energy):
+
+        def D12(part1, part2):
+            a1, b1, g1=part1
+            a2, b2, g2=part2
+            return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+        enval=0.
+
+        # Kinetic Energy
+        for a in range(len(positions)):
+            ax,bx,gx=positions[a]
+            adx,bdx,gdx=velocities[a]
+            enval+=.5*mass_arr[a]*( adx**2. + sinh(ax)**2.*bdx**2. + sinh(ax)**2.*sin(bx)**2.*gdx**2. )
+
+        # Potential Energy
+        for b in mesh[1]:
+            enval+=.5*spring_arr[mesh[1].index(b)][0]*( arccosh(D12(positions[b[0]],positions[b[1]])) - spring_arr[mesh[1].index(b)][1] )**2.
+
+        return (energy - enval)
+
+
+    
+    def jacobian(positions, velocities, mass_arr, h, spring_arr, mesh):
+        def geo_term_arr(pos, vel, h):
+            a1,b1,g1=pos
+            ad1,bd1,gd1=vel
+            return [
+                [ # position submatric
+                    [   # a1, b1, g1 derivatives of adn1 update constraint
+                        -.5*h*(bd1*bd1+sin(b1)*sin(b1)*gd1*gd1)*cosh(2.*a1),
+                        -.25*h*sinh(2.*a1)*sin(2.*b1)*gd1*gd1,
+                        0,
+                    ],
+                    [   # a1, b1, g1 derivatives of bdn1 update constraint
+                        -h*ad1*bd1/(sinh(a1)*sinh(a1)),
+                        -.5*h*cos(2.*b1)*gd1*gd1,
+                        0.
+                    ],
+                    [   # a1, b1, g1 derivatives of gdn1 update constraint
+                        -h*ad1*gd1/(sinh(a1)*sinh(a1)),
+                        -h*bd1*gd1/(sin(b1)*sin(b1)),
+                        0.
+                    ],
+                ],
+                [ # velocity submatrix
+                    [   # ad1, bd1, gd1 derivatives of adn1 update constraint
+                        1.,
+                        -.5*h*sinh(2.*a1)*bd1,
+                        -.5*h*sinh(2.*a1)*sin(b1)*sin(b1)*gd1
+                    ],
+                    [   # ad1, bd1, gd1 derivatives of bdn1 update constraint
+                        h/tanh(a1)*bd1,
+                        1.+h/tanh(a1)*ad1,
+                        -.5*h*sin(2.*b1)*gd1
+                    ],
+                    [   # ad1, bd1, gd1 derivatives of gdn1 update constraint
+                        h/tanh(a1)*gd1,
+                        h/tan(b1)*gd1,
+                        1.+h/tanh(a1)*ad1+h/tan(b1)*bd1
+                    ]
+                ]
+            ]
+
+        # Terms from geodesic equations
+        geo_arr=[]
+        for a in range(len(positions)):
+            geo_arr.append([])
+        
+        for b in range(len(geo_arr)):
+            geo_arr[b].append(geo_term_arr(positions[b], velocities[b], h))
+
+        # Terms from spring values
+        spring_terms=jacobi_sp_terms(mesh, mass_arr, spring_arr)
+
+        # Terms from energy values
+        energy_terms=jacobi_energy_terms(mesh, velocities, mass_arr, spring_arr)
+
+        # Contruct the matrix
+        jmat=zeros((3*len(positions)+3*len(velocities)+1,3*len(positions)+3*len(velocities)+1))
+
+        # Build upper half of matrix
+        iden_half=identity(3.*len(positions))
+        jmat[0:3*len(positions),0:3*len(positions)]=iden_half
+
+        h_half=-.5*h*identity(3.*len(velocities))
+        jmat[0:3*len(velocities),0+3*len(velocities):3*len(velocities)+3*len(velocities)]=h_half
+
+        # Build lower half of matrix
+        # Geodesic terms
+        for c in range(len(positions)):
+            # geodesic term for positions (lower left block diagonal)
+            jmat[3*len(positions)+3*c:3*len(positions)+3+3*c,0+3*c:3+3*c]=geo_arr[c][0]
+            # geodesic term for velocities (lower right block diagonal)
+            jmat[3*len(positions)+3*c:3*len(positions)+3+3*c,0+3*len(positions)+3*c:3+3*len(positions)+3*c]=geo_arr[c][1]
+
+        # Spring terms
+        jmat[3*len(positions):2*3*len(positions),0:3*len(positions)]=spring_terms
+
+        # Energy terms
+        jmat[-1,:]=energy_terms+[1.]
+
+        return jmat
+
+    # Generate the array of constraints
+    constraint_arr=[]
+    # Position updates
+    for g in range(len(mesh[0])):
+        constraint_arr.append(con1(mesh[0][g], mesh[0][g], veln_arr[g], veln_arr[g], step))
+        constraint_arr.append(con2(mesh[0][g], mesh[0][g], veln_arr[g], veln_arr[g], step))
+        constraint_arr.append(con3(mesh[0][g], mesh[0][g], veln_arr[g], veln_arr[g], step))
+
+    # Velocity updates
+    for j in range(len(mesh[0])):
+        constraint_arr.append(con4(mesh[0][j], mesh[0][j], conn_list[j], conn_list[j], veln_arr[j], veln_arr[j], mass_arr[j], step, spring_arr))
+        constraint_arr.append(con5(mesh[0][j], mesh[0][j], conn_list[j], conn_list[j], veln_arr[j], veln_arr[j], mass_arr[j], step, spring_arr))
+        constraint_arr.append(con6(mesh[0][j], mesh[0][j], conn_list[j], conn_list[j], veln_arr[j], veln_arr[j], mass_arr[j], step, spring_arr))
+
+    # Energy update
+    constraint_arr.append(con7(mesh[0], veln_arr, mass_arr, spring_arr, energy))
+    
+
+
+    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    diff1=linalg.solve(array(jacobian(mesh[0], veln_arr, mass_arr, step, spring_arr, mesh)),-array(constraint_arr))
+    val1=diff1.copy()
+    # Position updates
+    for s in range(len(mesh[0])):
+        val1[3*j+0]+=mesh[0][j][0]
+        val1[3*j+1]+=mesh[0][j][1]
+        val1[3*j+2]+=mesh[0][j][2]
+
+    # Velocity updates
+    for k in range(len(mesh[0])):
+        val1[3*k+0+3*len(mesh[0])]+=veln_arr[k][0]
+        val1[3*k+1+3*len(mesh[0])]+=veln_arr[k][1]
+        val1[3*k+2+3*len(mesh[0])]+=veln_arr[k][2]
+
+    # Energy update
+    val1[-1]+=energy
+
+    x = 0
+    while(x < 7):
+        new_pos_arr=[]
+        new_vel_arr=[]
+        for a in range(len(mesh[0])):
+            new_pos_arr.append(val1[0+3*a:3+3*a])
+            new_vel_arr.append(val1[3*len(mesh[0])+3*a:3+3*len(mesh[0])+3*a])
+        new_energy=val1[-1]
+
+        # Generate the new array of constraints
+        new_constraint_arr=[]
+        # Position updates
+        for g in range(len(mesh[0])):
+            new_constraint_arr.append(con1(mesh[0][g], new_pos_arr[g], veln_arr[g], new_vel_arr[g], step))
+            new_constraint_arr.append(con2(mesh[0][g], new_pos_arr[g], veln_arr[g], new_vel_arr[g], step))
+            new_constraint_arr.append(con3(mesh[0][g], new_pos_arr[g], veln_arr[g], new_vel_arr[g], step))
+
+        # Velocity updates
+        for j in range(len(mesh[0])):
+            new_constraint_arr.append(con4(mesh[0][j], new_pos_arr[j], conn_list[j], conn_list[j], veln_arr[j], new_vel_arr[j], mass_arr[j], step, spring_arr))
+            new_constraint_arr.append(con5(mesh[0][j], new_pos_arr[j], conn_list[j], conn_list[j], veln_arr[j], new_vel_arr[j], mass_arr[j], step, spring_arr))
+            new_constraint_arr.append(con6(mesh[0][j], new_pos_arr[j], conn_list[j], conn_list[j], veln_arr[j], new_vel_arr[j], mass_arr[j], step, spring_arr))
+
+        # Energy update
+        new_constraint_arr.append(con7(new_pos_arr, new_vel_arr, mass_arr, spring_arr, new_energy))
+
+        diff2=linalg.solve(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr, mesh),-array(new_constraint_arr))
+        val2=np.add(array(val1),array(diff2)).tolist()   
         val1 = val2
         x=x+1
     #print(val1[9:17])

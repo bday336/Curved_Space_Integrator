@@ -1,4 +1,4 @@
-from symint_bank import imph3sprot3
+from symint_bank import imph3sprot3,imph3sprot3_condense_econ
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -47,8 +47,8 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 # Analytic Test Initial Velocities
 particles=array([
     np.concatenate((array([arccosh(cosh(1)/cosh(.5)),np.pi/2.,0.]),initial_con(array([arccosh(cosh(1)/cosh(.5)),np.pi/2.,0.]),1.,.0),[1.,.2])),       #particle 1
-    np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),1.,.0),[1.,.2])),       #particle 2
-    np.concatenate((array([.5,np.pi/2.,3.*np.pi/2.]),initial_con(array([.5,np.pi/2.,3.*np.pi/2.]),1.,.0),[1.,.2]))        #particle 3
+    np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),1.,.0),[1.,.2])),                                   #particle 2
+    np.concatenate((array([.5,np.pi/2.,3.*np.pi/2.]),initial_con(array([.5,np.pi/2.,3.*np.pi/2.]),1.,.0),[1.,.2]))                                    #particle 3
     ])
 
 # Initialize the parameters of what I will consider the
@@ -100,6 +100,7 @@ ggt = []
 dist12 = []
 dist13 = []
 dist23 = []
+energy_dat=[]
 
 # Include the intial data
 gat=append(gat, array([positions[0][0],positions[1][0],positions[2][0]]))
@@ -111,9 +112,19 @@ dist12=append(dist12,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3
 dist13=append(dist13,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 dist23=append(dist23,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 
+# Energy of system
+energy = (
+    .5*masses[0]*( velocities[0][0]*velocities[0][0] + sinh(gat[-3])*sinh(gat[-3])*velocities[0][1]*velocities[0][1] + sinh(gat[-3])*sinh(gat[-3])*sin(gbt[-3])*sin(gbt[-3])*velocities[0][2]*velocities[0][2] ) +
+    .5*masses[1]*( velocities[1][0]*velocities[1][0] + sinh(gat[-2])*sinh(gat[-2])*velocities[1][1]*velocities[1][1] + sinh(gat[-2])*sinh(gat[-2])*sin(gbt[-2])*sin(gbt[-2])*velocities[1][2]*velocities[1][2] ) +
+    .5*masses[2]*( velocities[2][0]*velocities[2][0] + sinh(gat[-1])*sinh(gat[-1])*velocities[2][1]*velocities[2][1] + sinh(gat[-1])*sinh(gat[-1])*sin(gbt[-1])*sin(gbt[-1])*velocities[2][2]*velocities[2][2] ) +
+    .5*spring_arr[0][0]*( dist12[-1] - spring_arr[0][1] )**2. +
+    .5*spring_arr[1][0]*( dist13[-1] - spring_arr[1][1] )**2. +
+    .5*spring_arr[2][0]*( dist23[-1] - spring_arr[2][1] )**2.)
+energy_dat=append(energy_dat,energy)
+
 # Numerical Integration step
 step_data=array([
-	imph3sprot3(positions, velocities, delT, masses, spring_arr)
+	imph3sprot3_condense_econ(positions, velocities, delT, masses, spring_arr, energy)
 	])
 
 # Include the first time step
@@ -125,6 +136,9 @@ ggt=append(ggt, array([step_data[0][2],step_data[0][5],step_data[0][8]]))
 dist12=append(dist12,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
 dist13=append(dist13,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
 dist23=append(dist23,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+
+# Energy of system
+energy_dat=append(energy_dat,step_data[0][18])
 
 q=q+1
 
@@ -138,10 +152,11 @@ while(q < nump-1):
         nextdot= collisionh3(step_data[0][:3], step_data[1][:3],step_data[0][3:6], step_data[1][3:6],particles[0][6],particles[1][6],dist)
     else:
         nextpos = array([step_data[0][0:3], step_data[0][3:6], step_data[0][6:9]])
-        nextdot = array([step_data[0][9:12], step_data[0][12:15], step_data[0][15:]])
+        nextdot = array([step_data[0][9:12], step_data[0][12:15], step_data[0][15:18]])
+        next_energy = step_data[0][18]
 
     step_data=array([
-        imph3sprot3(nextpos, nextdot, delT, masses, spring_arr)
+        imph3sprot3_condense_econ(nextpos, nextdot, delT, masses, spring_arr, next_energy)
         ])
 
     gat=append(gat, array([step_data[0][0],step_data[0][3],step_data[0][6]]))
@@ -152,6 +167,9 @@ while(q < nump-1):
     dist12=append(dist12,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])]))
     dist13=append(dist13,h3dist([sinh(gat[-3])*sin(gbt[-3])*cos(ggt[-3]),sinh(gat[-3])*sin(gbt[-3])*sin(ggt[-3]),sinh(gat[-3])*cos(gbt[-3]),cosh(gat[-3])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
     dist23=append(dist23,h3dist([sinh(gat[-2])*sin(gbt[-2])*cos(ggt[-2]),sinh(gat[-2])*sin(gbt[-2])*sin(ggt[-2]),sinh(gat[-2])*cos(gbt[-2]),cosh(gat[-2])],[sinh(gat[-1])*sin(gbt[-1])*cos(ggt[-1]),sinh(gat[-1])*sin(gbt[-1])*sin(ggt[-1]),sinh(gat[-1])*cos(gbt[-1]),cosh(gat[-1])]))
+
+    # Energy of system
+    energy_dat=append(energy_dat,step_data[0][18])
 
     q=q+1
 
@@ -165,7 +183,12 @@ grt=[]
 for b in range(len(gat)):
     gut=append(gut,sinh(gat[b])*sin(gbt[b])*cos(ggt[b])/(cosh(gat[b]) + 1.))
     gvt=append(gvt,sinh(gat[b])*sin(gbt[b])*sin(ggt[b])/(cosh(gat[b]) + 1.))
-    grt=append(grt,sinh(gat[b])*cos(gbt[b])/(cosh(gat[b]) + 1.))	    	     		
+    grt=append(grt,sinh(gat[b])*cos(gbt[b])/(cosh(gat[b]) + 1.))	
+
+# Save the time series data
+np.savetxt("dist12_data.csv",dist12) 
+np.savetxt("dist13_data.csv",dist13) 
+np.savetxt("dist23_data.csv",dist23)    	     		
 
 #####################
 #  PLOTTING SECTION #
@@ -271,15 +294,23 @@ ax2.plot(timearr,dist23,label="Spring 23 Distance")
 ax2.set_xlabel('time (s)')
 ax2.legend(loc='lower right')
 
-# Force Plot
+# Energy Plot
 ax3=fig.add_subplot(1,3,3)
 
-ax3.plot(timearr,(dist12-spring_arr[0][1])*spring_arr[0][0],label="Spring 12 Force")
-ax3.plot(timearr,(dist13-spring_arr[1][1])*spring_arr[1][0],label="Spring 13 Force")
-ax3.plot(timearr,(dist23-spring_arr[2][1])*spring_arr[2][0],label="Spring 23 Force")
+ax3.plot(timearr,energy_dat,label="Energy")
 # ax3.set_yscale("log",basey=10)
 ax3.set_xlabel('time (s)')	
-ax3.legend(loc='lower right')	
+ax3.legend(loc='lower right')
+
+# Force Plot
+# ax3=fig.add_subplot(1,3,3)
+
+# ax3.plot(timearr,(dist12-spring_arr[0][1])*spring_arr[0][0],label="Spring 12 Force")
+# ax3.plot(timearr,(dist13-spring_arr[1][1])*spring_arr[1][0],label="Spring 13 Force")
+# ax3.plot(timearr,(dist23-spring_arr[2][1])*spring_arr[2][0],label="Spring 23 Force")
+# # ax3.set_yscale("log",basey=10)
+# ax3.set_xlabel('time (s)')	
+# ax3.legend(loc='lower right')	
 
 fig.tight_layout()	
 
