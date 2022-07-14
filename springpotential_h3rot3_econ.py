@@ -16,7 +16,7 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 # { ai , bi , gi , adi , bdi , gdi , mass , radius }
 
 # Initialize the particles in the simulation
-# Check Equilibrium (verified to 10^-16)
+#Check Equilibrium (verified to 10^-16)
 # particles=array([
 #     np.concatenate((array([.5,np.pi/2.,0.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,0.*2.*np.pi/3.]),.0,.0),[1.,.2])),       #particle 1
 #     np.concatenate((array([.5,np.pi/2.,1.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,1.*2.*np.pi/3.]),.0,.0),[1.,.2])),       #particle 2
@@ -25,9 +25,9 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 
 # Vertex Oriented Initial Velocities
 # particles=array([
-#     np.concatenate((array([.5,np.pi/2.,0.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,0.*2.*np.pi/3.]),.5,.0),[1.,.2])),       #particle 1
-#     np.concatenate((array([.5,np.pi/2.,1.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,1.*2.*np.pi/3.]),.5,.0),[1.,.2])),       #particle 2
-#     np.concatenate((array([.5,np.pi/2.,2.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,2.*2.*np.pi/3.]),.5,.0),[1.,.2]))        #particle 3
+#     np.concatenate((array([.5,np.pi/2.,0.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,0.*2.*np.pi/3.]),1.,.0),[1.,.2])),       #particle 1
+#     np.concatenate((array([.5,np.pi/2.,1.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,1.*2.*np.pi/3.]),1.,.0),[1.,.2])),       #particle 2
+#     np.concatenate((array([.5,np.pi/2.,2.*2.*np.pi/3.]),initial_con(array([.5,np.pi/2.,2.*2.*np.pi/3.]),1.,.0),[1.,.2]))        #particle 3
 #     ])
 
 # Edge Oriented Initial Velocities
@@ -44,7 +44,7 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 #     np.concatenate((convertpos_hyp2roth3(rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,np.pi/2.,2.*2.*np.pi/3.+np.pi/2.])),initial_con(convertpos_hyp2roth3(rotyh3(np.pi/2.) @ convertpos_rot2hyph3([.5,np.pi/2.,2.*2.*np.pi/3.+np.pi/2.])),.5,.0),[1.,.2]))        #particle 3
 #     ])
 
-# Analytic Test Initial Velocities
+# # Analytic Test Initial Velocities
 particles=array([
     np.concatenate((array([arccosh(cosh(1)/cosh(.5)),np.pi/2.,0.]),initial_con(array([arccosh(cosh(1)/cosh(.5)),np.pi/2.,0.]),1.,.0),[1.,.2])),       #particle 1
     np.concatenate((array([.5,np.pi/2.,1.*np.pi/2.]),initial_con(array([.5,np.pi/2.,1.*np.pi/2.]),1.,.0),[1.,.2])),                                   #particle 2
@@ -63,7 +63,7 @@ particles=array([
 #     [1.,0.874436528313447],    #spring 23
 #     ])
 
-# Analytic test
+# # Analytic test
 spring_arr=array([
     [1.,1.],    #spring 13
     [1.,1.],    #spring 23
@@ -185,10 +185,10 @@ for b in range(len(gat)):
     gvt=append(gvt,sinh(gat[b])*sin(gbt[b])*sin(ggt[b])/(cosh(gat[b]) + 1.))
     grt=append(grt,sinh(gat[b])*cos(gbt[b])/(cosh(gat[b]) + 1.))	
 
-# Save the time series data
-np.savetxt("dist12_data.csv",dist12) 
-np.savetxt("dist13_data.csv",dist13) 
-np.savetxt("dist23_data.csv",dist23)    	     		
+# # Save the time series data
+# np.savetxt("dist12_data.csv",dist12) 
+# np.savetxt("dist13_data.csv",dist13) 
+# np.savetxt("dist23_data.csv",dist23)    	     		
 
 #####################
 #  PLOTTING SECTION #

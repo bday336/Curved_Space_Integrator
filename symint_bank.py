@@ -1,3 +1,5 @@
+import numpy as np
+import copy as cp
 from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arccos,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,linalg,add
 from function_bank import boostxh2e,h2dist,boostxh2,rotzh2,convertpos_hyp2paratransh2,convertvel_hyp2paratransh2
 
@@ -5971,12 +5973,22 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
         a1,b1,g1=positions[0]
         a2,b2,g2=positions[1]
         a3,b3,g3=positions[2]
+        print("New spring data")
+        print("positions")
+        print(positions)
+
         ### Spring 1-2 spring_arr[0]###
         sp12_darr=derivative_terms(a1, b1, g1, a2, b2, g2)
+        print("Spring_data1")
+        print(sp12_darr)
         ### Spring 1-3 spring_arr[1]###
         sp13_darr=derivative_terms(a1, b1, g1, a3, b3, g3)
+        print("Spring_data2")
+        print(sp13_darr)
         ### Spring 2-3 spring_arr[2]###
         sp23_darr=derivative_terms(a2, b2, g2, a3, b3, g3)
+        print("Spring_data3")
+        print(sp23_darr)
 
         
 
@@ -6366,11 +6378,25 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
         ad1n1,bd1n1,gd1n1=velocities[0]
         ad2n1,bd2n1,gd2n1=velocities[1]
         ad3n1,bd3n1,gd3n1=velocities[2]
+        # print("Positions")
+        # print(positions)
+        # print("Velocities")
+        # print(velocities)
         spring_terms=jacobi_sp_terms(positions, mass_arr, spring_arr)
+        print("Spring_terms")
+        print(spring_terms)
         energy_terms=jacobi_energy_terms(positions, velocities, mass_arr, spring_arr)
+        print("Energy_terms")
+        print(energy_terms)
         geo_term_p1=geo_term_arr(a1n1, b1n1, g1n1, ad1n1, bd1n1, gd1n1, h)
+        print("geo1_terms")
+        print(geo_term_p1)
         geo_term_p2=geo_term_arr(a2n1, b2n1, g2n1, ad2n1, bd2n1, gd2n1, h)
+        print("geo2_terms")
+        print(geo_term_p2)
         geo_term_p3=geo_term_arr(a3n1, b3n1, g3n1, ad3n1, bd3n1, gd3n1, h)
+        print("geo3_terms")
+        print(geo_term_p3)
         #print(spring_terms)
         return array([
             [1.,0.,0., 0.,0.,0., 0.,0.,0., -.5*h,0.,0., 0.,0.,0., 0.,0.,0., 0.],
@@ -6604,6 +6630,39 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
         ])
 
     # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
+    # print("initial Jacobian")
+    # print(jacobian(posn_arr, veln_arr, mass_arr, step, spring_arr))
+    # print("Contraint_array")
+    # print(-array([
+    #     #p1
+    #     con1(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+    #     con2(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+    #     con3(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+    #     #p2
+    #     con1(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+    #     con2(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+    #     con3(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+    #     #p3
+    #     con1(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+    #     con2(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+    #     con3(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+
+    #     #v1
+    #     con4(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+    #     con5(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+    #     con6(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+    #     #v2
+    #     con4(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+    #     con5(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+    #     con6(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+    #     #v3
+    #     con4(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+    #     con5(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+    #     con6(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+
+    #     #energy
+    #     con7(posn_arr, veln_arr, mass_arr, spring_arr, energy)    
+    # ]))
     diff1=linalg.solve(jacobian(posn_arr, veln_arr, mass_arr, step, spring_arr),-array([
         #p1
         con1(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
@@ -6634,6 +6693,8 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
         #energy
         con7(posn_arr, veln_arr, mass_arr, spring_arr, energy)    
     ]))
+    # print("diff1")
+    # print(diff1)
     val1 = array([
             posn_arr[0][0]+diff1[0], posn_arr[0][1]+diff1[1], posn_arr[0][2]+diff1[2], 
             posn_arr[1][0]+diff1[3], posn_arr[1][1]+diff1[4], posn_arr[1][2]+diff1[5], 
@@ -6644,7 +6705,40 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
             veln_arr[2][0]+diff1[15], veln_arr[2][1]+diff1[16], veln_arr[2][2]+diff1[17],
 
             energy+diff1[18]
-            ])    
+            ])  
+    print("Initial constaint arr")
+    print(-array([
+        #p1
+        con1(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con2(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        con3(posn_arr[0][0],posn_arr[0][0], posn_arr[0][1], posn_arr[0][1], posn_arr[0][2], posn_arr[0][2], veln_arr[0][0], veln_arr[0][0], veln_arr[0][1], veln_arr[0][1], veln_arr[0][2], veln_arr[0][2], step),
+        #p2
+        con1(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con2(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        con3(posn_arr[1][0],posn_arr[1][0], posn_arr[1][1], posn_arr[1][1], posn_arr[1][2], posn_arr[1][2], veln_arr[1][0], veln_arr[1][0], veln_arr[1][1], veln_arr[1][1], veln_arr[1][2], veln_arr[1][2], step),
+        #p3
+        con1(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+        con2(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+        con3(posn_arr[2][0],posn_arr[2][0], posn_arr[2][1], posn_arr[2][1], posn_arr[2][2], posn_arr[2][2], veln_arr[2][0], veln_arr[2][0], veln_arr[2][1], veln_arr[2][1], veln_arr[2][2], veln_arr[2][2], step),
+
+        #v1
+        con4(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        con5(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        con6(posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],posn_arr[2],posn_arr[2],veln_arr[0],veln_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+        #v2
+        con4(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        con5(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        con6(posn_arr[1],posn_arr[1],posn_arr[0],posn_arr[0],posn_arr[2],posn_arr[2],veln_arr[1],veln_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+        #v3
+        con4(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+        con5(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+        con6(posn_arr[2],posn_arr[2],posn_arr[0],posn_arr[0],posn_arr[1],posn_arr[1],veln_arr[2],veln_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+
+        #energy
+        con7(posn_arr, veln_arr, mass_arr, spring_arr, energy)    
+    ]))
+    print("initial val1")
+    print(val1) 
     x = 0
     while(x < 7):
         new_pos_arr=array([val1[0:3],val1[3:6],val1[6:9]])
@@ -6692,6 +6786,41 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
             val1[18]+diff2[18]
             ])
         val1 = val2
+        # print("jacobian")
+        # print(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr))
+        print("constraint arr")
+        print(-array([
+            #p1
+            con1(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con2(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            con3(posn_arr[0][0],new_pos_arr[0][0], posn_arr[0][1], new_pos_arr[0][1], posn_arr[0][2], new_pos_arr[0][2], veln_arr[0][0], new_vel_arr[0][0], veln_arr[0][1], new_vel_arr[0][1], veln_arr[0][2], new_vel_arr[0][2], step),
+            #p2
+            con1(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con2(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            con3(posn_arr[1][0],new_pos_arr[1][0], posn_arr[1][1], new_pos_arr[1][1], posn_arr[1][2], new_pos_arr[1][2], veln_arr[1][0], new_vel_arr[1][0], veln_arr[1][1], new_vel_arr[1][1], veln_arr[1][2], new_vel_arr[1][2], step),
+            #p3
+            con1(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+            con2(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+            con3(posn_arr[2][0],new_pos_arr[2][0], posn_arr[2][1], new_pos_arr[2][1], posn_arr[2][2], new_pos_arr[2][2], veln_arr[2][0], new_vel_arr[2][0], veln_arr[2][1], new_vel_arr[2][1], veln_arr[2][2], new_vel_arr[2][2], step),
+
+            #v1
+            con4(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            con5(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            con6(posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],posn_arr[2],new_pos_arr[2],veln_arr[0],new_vel_arr[0],mass_arr[0],step,spring_arr[0],spring_arr[1]),
+            #v2
+            con4(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con5(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            con6(posn_arr[1],new_pos_arr[1],posn_arr[0],new_pos_arr[0],posn_arr[2],new_pos_arr[2],veln_arr[1],new_vel_arr[1],mass_arr[1],step,spring_arr[0],spring_arr[2]),
+            #v3
+            con4(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con5(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+            con6(posn_arr[2],new_pos_arr[2],posn_arr[0],new_pos_arr[0],posn_arr[1],new_pos_arr[1],veln_arr[2],new_vel_arr[2],mass_arr[2],step,spring_arr[1],spring_arr[2]),
+
+            #energy 
+            con7(new_pos_arr, new_vel_arr, mass_arr, spring_arr, new_energy)
+        ]))
+        print("val1")
+        print(val1)
         x=x+1
     #print(val1[9:17])
     return val1
@@ -6921,9 +7050,16 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             ]
 
         spring_data=[]
+        # print("New spring terms data")
+        # print("positions")
+        # print(mesh[0])
+        # print("links")
+        # print(mesh[1])
 
         for a in mesh[1]:
             spring_data.append(derivative_terms(mesh[0][a[0]],mesh[0][a[1]]))
+        # print("Spring_Data")
+        # print(spring_data)
         
         # ### Spring 1-2 spring_arr[0]###
         # sp12_darr=derivative_terms(positions[0],positions[1])
@@ -6932,10 +7068,12 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         # ### Spring 2-3 spring_arr[2]###
         # sp23_darr=derivative_terms(positions[1],positions[2])
 
-        spring_matrix=[]
-        for b in range(3*len(mesh[0])):
-            for c in range(3*len(mesh[0])):
-                spring_matrix.append([])
+        # spring_matrix=[]
+        # for b in range(3*len(mesh[0])):
+        #     spring_matrix.append([])
+        #     for c in range(3*len(mesh[0])):
+        #         spring_matrix[-1].append([])
+        spring_matrix=zeros((3*len(mesh[0]),3*len(mesh[0]))) # initialize as matrix of zeros in case no spring between vertices
 
         sp_count=0
 
@@ -6953,17 +7091,17 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             spring_matrix[3*b[0]+2][3*b[0]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][2], 0.,                                                  spring_data[sp_count][2][2][2])
 
 
-            spring_matrix[3*b[0]+0][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][3][3])
-            spring_matrix[3*b[0]+0][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][3][4])
-            spring_matrix[3*b[0]+0][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][3][5])
+            spring_matrix[3*b[0]+0][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][0][3])
+            spring_matrix[3*b[0]+0][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][0][4])
+            spring_matrix[3*b[0]+0][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][0][5])
 
-            spring_matrix[3*b[0]+1][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][4][3])
-            spring_matrix[3*b[0]+1][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][4][4])
-            spring_matrix[3*b[0]+1][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][4][5])
+            spring_matrix[3*b[0]+1][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][1], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][1][3])
+            spring_matrix[3*b[0]+1][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][1], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][1][4])
+            spring_matrix[3*b[0]+1][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][1], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][1][5])
 
-            spring_matrix[3*b[0]+2][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][5][3])
-            spring_matrix[3*b[0]+2][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][5][4])
-            spring_matrix[3*b[0]+2][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][5][5])
+            spring_matrix[3*b[0]+2][3*b[1]+0]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][3], 0., spring_data[sp_count][2][2][3])
+            spring_matrix[3*b[0]+2][3*b[1]+1]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][2][4])
+            spring_matrix[3*b[0]+2][3*b[1]+2]+=da2da1V12(mass_arr[b[0]], sinh(mesh[0][b[0]][0])**2.*sin(mesh[0][b[0]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][2], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][2][5])
 
 
             spring_matrix[3*b[1]+0][3*b[0]+0]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][0], 0., spring_data[sp_count][2][3][0])
@@ -6983,7 +7121,7 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             spring_matrix[3*b[1]+0][3*b[1]+1]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][4], 0., spring_data[sp_count][2][3][4])
             spring_matrix[3*b[1]+0][3*b[1]+2]+=da2da1V12(mass_arr[b[1]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][3], spring_data[sp_count][1][5], 0., spring_data[sp_count][2][3][5])
 
-            spring_matrix[3*b[1]+1][3*b[1]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][3], sinh(2.*mesh[0][b[0]][0]), spring_data[sp_count][2][4][3])
+            spring_matrix[3*b[1]+1][3*b[1]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][3], sinh(2.*mesh[0][b[1]][0]), spring_data[sp_count][2][4][3])
             spring_matrix[3*b[1]+1][3*b[1]+1]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][4], 0.,                        spring_data[sp_count][2][4][4])
             spring_matrix[3*b[1]+1][3*b[1]+2]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][4], spring_data[sp_count][1][5], 0.,                        spring_data[sp_count][2][4][5])
 
@@ -7030,11 +7168,13 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             ]
 
         spring_data=[]
-        print(mesh)
+        # print(mesh)
 
         for a in mesh[1]:
-            print(a)
+            # print(a)
             spring_data.append(derivative_terms(mesh[0][a[0]],mesh[0][a[1]]))
+        # print("Spring_Data")
+        # print(spring_data)
         
         # ### Spring 1-2 spring_arr[0]###
         # sp12_darr=derivative_terms(positions[0],positions[1])
@@ -7043,9 +7183,10 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         # ### Spring 2-3 spring_arr[2]###
         # sp23_darr=derivative_terms(positions[1],positions[2])
 
-        energy_vector=[]
-        for c in range(3*2*len(mesh[0])):
-                energy_vector.append([])
+        # energy_vector=[]
+        # for c in range(3*2*len(mesh[0])):
+        #         energy_vector.append([])
+        energy_vector=(zeros((1,3*2*len(mesh[0])))[0]).tolist()
 
         for b in range(len(mesh[0])):
             # position terms (kinetic energy)
@@ -7096,7 +7237,7 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         adn1,bdn1,gdn1=base_vel_guess
         return gn1 - gn - .5*h*(gdn + gdn1)        
 
-    def con4(base_pos, base_pos_guess, spokes_pos_list, spokes_pos_list_guess, base_vel, base_vel_guess, m1, h, sp_arr):
+    def con4(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
         def geo_spring_term_ad(a1, b1, g1, a2, b2, g2, m, sp12):
             return (-sp12[0]/(m*1.)*( 
             arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
@@ -7111,18 +7252,18 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
 
         nval=(bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n)
         n1val=(bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1)
+        # print("bacon")
+        # print(meshn[0])
 
-        for a in spokes_pos_list:
-            axn,bxn,gxn=mesh[0][a[0]]
+        for a in spokes_conn_list:
+            axn,bxn,gxn=meshn[0][a[0]]
             nval+=geo_spring_term_ad(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
-
-        for b in spokes_pos_list_guess:
-            axn1,bxn1,gxn1=mesh[0][a[0]]
+            axn1,bxn1,gxn1=meshn1[0][a[0]]
             n1val+=geo_spring_term_ad(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
 
         return (ad1n1 - ad1n - .5*h*(nval+n1val))
 
-    def con5(base_pos, base_pos_guess, spokes_pos_list, spokes_pos_list_guess, base_vel, base_vel_guess, m1, h, sp_arr):
+    def con5(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
         def geo_spring_term_bd(a1, b1, g1, a2, b2, g2, m, sp12):
             return (-sp12[0]/(m*sinh(a1)*sinh(a1))*( 
             arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
@@ -7137,17 +7278,15 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         nval=gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n)
         n1val=gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1)
 
-        for a in spokes_pos_list:
-            axn,bxn,gxn=mesh[0][a[0]]
+        for a in spokes_conn_list:
+            axn,bxn,gxn=meshn[0][a[0]]
             nval+=geo_spring_term_bd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
-
-        for b in spokes_pos_list_guess:
-            axn1,bxn1,gxn1=mesh[0][a[0]]
+            axn1,bxn1,gxn1=meshn1[0][a[0]]
             n1val+=geo_spring_term_bd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
 
         return (bd1n1 - bd1n - .5*h*(nval+n1val))
 
-    def con6(base_pos, base_pos_guess, spokes_pos_list, spokes_pos_list_guess, base_vel, base_vel_guess, m1, h, sp_arr):
+    def con6(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
         def geo_spring_term_gd(a1, b1, g1, a2, b2, g2, m, sp12):
             return (-sp12[0]/(m*sinh(a1)*sinh(a1)*sin(b1)*sin(b1))*( 
             arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
@@ -7162,12 +7301,10 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         nval=-2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n)
         n1val=-2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1)
 
-        for a in spokes_pos_list:
-            axn,bxn,gxn=mesh[0][a[0]]
+        for a in spokes_conn_list:
+            axn,bxn,gxn=meshn[0][a[0]]
             nval+=geo_spring_term_gd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
-
-        for b in spokes_pos_list_guess:
-            axn1,bxn1,gxn1=mesh[0][a[0]]
+            axn1,bxn1,gxn1=meshn1[0][a[0]]
             n1val+=geo_spring_term_gd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
 
         return (gd1n1 - gd1n - .5*h*(nval+n1val))
@@ -7200,11 +7337,11 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             a1,b1,g1=pos
             ad1,bd1,gd1=vel
             return [
-                [ # position submatric
+                [ # position submatrix
                     [   # a1, b1, g1 derivatives of adn1 update constraint
                         -.5*h*(bd1*bd1+sin(b1)*sin(b1)*gd1*gd1)*cosh(2.*a1),
                         -.25*h*sinh(2.*a1)*sin(2.*b1)*gd1*gd1,
-                        0,
+                        0.
                     ],
                     [   # a1, b1, g1 derivatives of bdn1 update constraint
                         -h*ad1*bd1/(sinh(a1)*sinh(a1)),
@@ -7239,25 +7376,35 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         # Terms from geodesic equations
         geo_arr=[]
         for a in range(len(positions)):
-            geo_arr.append([])
+            geo_arr.append(geo_term_arr(positions[a], velocities[a], h))
+        # print("Positions")
+        # print(positions)
+        # print("velocities")
+        # print(velocities)
         
-        for b in range(len(geo_arr)):
-            geo_arr[b].append(geo_term_arr(positions[b], velocities[b], h))
+        # for b in range(len(geo_arr)):
+        #     geo_arr[b].append(geo_term_arr(positions[b], velocities[b], h))
+        # print("Geo_terms")
+        # print(geo_arr)
 
         # Terms from spring values
         spring_terms=jacobi_sp_terms(mesh, mass_arr, spring_arr)
+        # print("Spring_terms")
+        # print(spring_terms)
 
         # Terms from energy values
         energy_terms=jacobi_energy_terms(mesh, velocities, mass_arr, spring_arr)
+        # print("Energy_terms")
+        # print(energy_terms)
 
         # Contruct the matrix
         jmat=zeros((3*len(positions)+3*len(velocities)+1,3*len(positions)+3*len(velocities)+1))
 
         # Build upper half of matrix
-        iden_half=identity(3.*len(positions))
+        iden_half=identity(3*len(positions))
         jmat[0:3*len(positions),0:3*len(positions)]=iden_half
 
-        h_half=-.5*h*identity(3.*len(velocities))
+        h_half=-.5*h*identity(3*len(velocities))
         jmat[0:3*len(velocities),0+3*len(velocities):3*len(velocities)+3*len(velocities)]=h_half
 
         # Build lower half of matrix
@@ -7269,81 +7416,130 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             jmat[3*len(positions)+3*c:3*len(positions)+3+3*c,0+3*len(positions)+3*c:3+3*len(positions)+3*c]=geo_arr[c][1]
 
         # Spring terms
-        jmat[3*len(positions):2*3*len(positions),0:3*len(positions)]=spring_terms
+        jmat[3*len(positions):2*3*len(positions),0:3*len(positions)]=np.add(jmat[3*len(positions):2*3*len(positions),0:3*len(positions)],spring_terms)
 
         # Energy terms
         jmat[-1,:]=energy_terms+[1.]
 
         return jmat
 
-    # Generate the array of constraints
+    ### Start of body of solver ###
+
+    # Extract mesh information for indexing moving forward
+    vert_num=len(mesh[0])
+    sp_num=len(mesh[1])
+
+    # Copy the mesh and velocities to avoid calling the wrong instance in functions
+    # The only part that will be potentially effect are the positions for mesh
+    input_mesh=cp.deepcopy(mesh)    # Initial mesh given to solver
+    solver_mesh=cp.deepcopy(mesh)   # Current version of mesh in iterations (version being updated)
+
+    input_velarr=cp.deepcopy(veln_arr)    # Initial array of velocities given to solver
+    solver_velarr=cp.deepcopy(veln_arr)   # Current version of array of velocities in iterations (version being updated)
+
+    # Generate the array of constraints for Newton root solver
     constraint_arr=[]
     # Position updates
-    for g in range(len(mesh[0])):
-        constraint_arr.append(con1(mesh[0][g], mesh[0][g], veln_arr[g], veln_arr[g], step))
-        constraint_arr.append(con2(mesh[0][g], mesh[0][g], veln_arr[g], veln_arr[g], step))
-        constraint_arr.append(con3(mesh[0][g], mesh[0][g], veln_arr[g], veln_arr[g], step))
+    for a in range(vert_num):
+        constraint_arr.append(con1(input_mesh[0][a], input_mesh[0][a], input_velarr[a], input_velarr[a], step))
+        constraint_arr.append(con2(input_mesh[0][a], input_mesh[0][a], input_velarr[a], input_velarr[a], step))
+        constraint_arr.append(con3(input_mesh[0][a], input_mesh[0][a], input_velarr[a], input_velarr[a], step))
 
     # Velocity updates
-    for j in range(len(mesh[0])):
-        constraint_arr.append(con4(mesh[0][j], mesh[0][j], conn_list[j], conn_list[j], veln_arr[j], veln_arr[j], mass_arr[j], step, spring_arr))
-        constraint_arr.append(con5(mesh[0][j], mesh[0][j], conn_list[j], conn_list[j], veln_arr[j], veln_arr[j], mass_arr[j], step, spring_arr))
-        constraint_arr.append(con6(mesh[0][j], mesh[0][j], conn_list[j], conn_list[j], veln_arr[j], veln_arr[j], mass_arr[j], step, spring_arr))
+    for b in range(vert_num):
+        constraint_arr.append(con4(input_mesh[0][b], input_mesh[0][b], conn_list[b], input_velarr[b], input_velarr[b], mass_arr[b], step, spring_arr, input_mesh, input_mesh))
+        constraint_arr.append(con5(input_mesh[0][b], input_mesh[0][b], conn_list[b], input_velarr[b], input_velarr[b], mass_arr[b], step, spring_arr, input_mesh, input_mesh))
+        constraint_arr.append(con6(input_mesh[0][b], input_mesh[0][b], conn_list[b], input_velarr[b], input_velarr[b], mass_arr[b], step, spring_arr, input_mesh, input_mesh))
 
     # Energy update
-    constraint_arr.append(con7(mesh[0], veln_arr, mass_arr, spring_arr, energy))
+    constraint_arr.append(con7(input_mesh[0], input_velarr, mass_arr, spring_arr, energy))
     
 
 
     # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
-    diff1=linalg.solve(array(jacobian(mesh[0], veln_arr, mass_arr, step, spring_arr, mesh)),-array(constraint_arr))
+    # print("initial Jacobian")
+    # print(array(jacobian(mesh[0], veln_arr, mass_arr, step, spring_arr, mesh),dtype=np.float))
+    # print("constraint_arrary")
+    # print(-array(constraint_arr,dtype=np.float))
+    diff1=linalg.solve(array(jacobian(input_mesh[0], input_velarr, mass_arr, step, spring_arr, input_mesh),dtype=np.float),-array(constraint_arr,dtype=np.float))
+    # print("Diff1")
+    # print(diff1)
     val1=diff1.copy()
     # Position updates
-    for s in range(len(mesh[0])):
-        val1[3*j+0]+=mesh[0][j][0]
-        val1[3*j+1]+=mesh[0][j][1]
-        val1[3*j+2]+=mesh[0][j][2]
+    for c in range(vert_num):
+        val1[3*c+0]+=input_mesh[0][c][0]
+        val1[3*c+1]+=input_mesh[0][c][1]
+        val1[3*c+2]+=input_mesh[0][c][2]
 
     # Velocity updates
-    for k in range(len(mesh[0])):
-        val1[3*k+0+3*len(mesh[0])]+=veln_arr[k][0]
-        val1[3*k+1+3*len(mesh[0])]+=veln_arr[k][1]
-        val1[3*k+2+3*len(mesh[0])]+=veln_arr[k][2]
+    for d in range(vert_num):
+        val1[3*d+0+3*vert_num]+=input_velarr[d][0]
+        val1[3*d+1+3*vert_num]+=input_velarr[d][1]
+        val1[3*d+2+3*vert_num]+=input_velarr[d][2]
 
     # Energy update
     val1[-1]+=energy
 
+    # print("Initial constaint arr")
+    # print(-array(constraint_arr))
+    # print("initial val1")
+    # print(val1)
+
+
     x = 0
     while(x < 7):
+        # Values from the results of the previous root iteration
         new_pos_arr=[]
         new_vel_arr=[]
-        for a in range(len(mesh[0])):
-            new_pos_arr.append(val1[0+3*a:3+3*a])
-            new_vel_arr.append(val1[3*len(mesh[0])+3*a:3+3*len(mesh[0])+3*a])
+        for e in range(vert_num):
+            new_pos_arr.append(val1[0+3*e:3+3*e])
+            new_vel_arr.append(val1[3*vert_num+3*e:3+3*vert_num+3*e])
         new_energy=val1[-1]
+        # print("initial_pos_arr")
+        # print(mesh[0])
+        # print("new_pos_arr")
+        # print(new_pos_arr)
+        # print("initial_vel_arr")
+        # print(veln_arr)
+        # print("new_vel_arr")
+        # print(new_vel_arr)
+
+        # Update the current version of the mesh and velocity array
+        solver_mesh[0]=new_pos_arr
+        solver_velarr=new_vel_arr
+        # print("new_mesh")
+        # print(solver_mesh)
 
         # Generate the new array of constraints
         new_constraint_arr=[]
         # Position updates
-        for g in range(len(mesh[0])):
-            new_constraint_arr.append(con1(mesh[0][g], new_pos_arr[g], veln_arr[g], new_vel_arr[g], step))
-            new_constraint_arr.append(con2(mesh[0][g], new_pos_arr[g], veln_arr[g], new_vel_arr[g], step))
-            new_constraint_arr.append(con3(mesh[0][g], new_pos_arr[g], veln_arr[g], new_vel_arr[g], step))
+        for f in range(vert_num):
+            new_constraint_arr.append(con1(input_mesh[0][f], solver_mesh[0][f], input_velarr[f], solver_velarr[f], step))
+            new_constraint_arr.append(con2(input_mesh[0][f], solver_mesh[0][f], input_velarr[f], solver_velarr[f], step))
+            new_constraint_arr.append(con3(input_mesh[0][f], solver_mesh[0][f], input_velarr[f], solver_velarr[f], step))
 
         # Velocity updates
-        for j in range(len(mesh[0])):
-            new_constraint_arr.append(con4(mesh[0][j], new_pos_arr[j], conn_list[j], conn_list[j], veln_arr[j], new_vel_arr[j], mass_arr[j], step, spring_arr))
-            new_constraint_arr.append(con5(mesh[0][j], new_pos_arr[j], conn_list[j], conn_list[j], veln_arr[j], new_vel_arr[j], mass_arr[j], step, spring_arr))
-            new_constraint_arr.append(con6(mesh[0][j], new_pos_arr[j], conn_list[j], conn_list[j], veln_arr[j], new_vel_arr[j], mass_arr[j], step, spring_arr))
+        for g in range(vert_num):
+            new_constraint_arr.append(con4(input_mesh[0][g], solver_mesh[0][g], conn_list[g], input_velarr[g], solver_velarr[g], mass_arr[g], step, spring_arr, input_mesh, solver_mesh))
+            new_constraint_arr.append(con5(input_mesh[0][g], solver_mesh[0][g], conn_list[g], input_velarr[g], solver_velarr[g], mass_arr[g], step, spring_arr, input_mesh, solver_mesh))
+            new_constraint_arr.append(con6(input_mesh[0][g], solver_mesh[0][g], conn_list[g], input_velarr[g], solver_velarr[g], mass_arr[g], step, spring_arr, input_mesh, solver_mesh))
 
         # Energy update
-        new_constraint_arr.append(con7(new_pos_arr, new_vel_arr, mass_arr, spring_arr, new_energy))
+        new_constraint_arr.append(con7(solver_mesh[0], solver_velarr, mass_arr, spring_arr, new_energy))
 
-        diff2=linalg.solve(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr, mesh),-array(new_constraint_arr))
+        diff2=linalg.solve(array(jacobian(solver_mesh[0], solver_velarr, mass_arr, step, spring_arr, solver_mesh),dtype=np.float),-array(new_constraint_arr,dtype=np.float))
         val2=np.add(array(val1),array(diff2)).tolist()   
         val1 = val2
+        # print("jacobian")
+        # print(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr, new_mesh))
+        # print("constraint_Arr")
+        # print(-array(new_constraint_arr))
+        # print("val1")
+        # print(val1)
         x=x+1
     #print(val1[9:17])
+    # print("Val1")
+    # print(val1)
     return val1
 
 #########################################################
