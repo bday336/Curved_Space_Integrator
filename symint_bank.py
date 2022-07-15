@@ -6827,25 +6827,26 @@ def imph3sprot3_condense_econ(posn_arr, veln_arr, step, mass_arr, spring_arr, en
 
 def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_list):
 
-    # This seems more complicated, but I am constructing these so that the jacobian elements are not super long.
-    # I have found that I do not need to make functions for both particles since I can just flip the arguments
-    # and it should work fine since they are symmetric. In principle, I think that I do not need to generate
-    # any new functions for this system. I just have to be careful with the arguments I use in the functions.
-    # In spring terms are more numerous given that each particle is connected to three other particles. When 
-    # using the below functions the more general notation of Dmn just needs to be considered with 1=m and 2=n.
-    # This is so I do not introduce any unintended errors by changing the variables.
+    # These functions return values involving the distance between two particles in the mesh. They
+    # are written in terms of the rotational parameterization (a,b,g) of the hyperboloid model of H^3. Here
+    # the value D12 is connected to the distance function by 
+    #
+    # Dist(p1,p2)=arccosh(D12)
+    #
+    # These values are needed when taking derivatives of the distance function in the equations of
+    # motion. Due to the symmetry of the expression D12 the number of functions is reduced for the 
+    # derivatives by swapping what is considered p1 and p2.
 
-    # This is the argument inside the arccosh of the distance function. It is the same for both particles
-    # due to the symmetric of the equation between particle 1 and 2. This can be used as a general function
-    # I just have to be careful about the arguments for the various particle pairs.
+    ### D12 Functions ###
+
+    # The function D12
     def D12(a1, b1, g1, a2, b2, g2):
         return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
 
-    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetric
+    # These are the first derivatives of the D12 function with respective to a1, b1, and g1. Due to the symmetry
     # of the particle coordinates between particle 1 and 2, I have verified that these are the only first
     # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
     # with the arguments flipped. Thus only three functions are needed instead of six.
-    
     # For the remaining three functions use:
     # da2D12 = da1D12(a2, b2, g2, a1, b1, g1)
     # db2D12 = db1D12(a2, b2, g2, a1, b1, g1)
@@ -6858,15 +6859,13 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
 
     def dg1D12(a1, b1, g1, a2, b2, g2):
         return sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2)      
-    
 
-    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetric
+    # These are the second derivatives of the D12 function with respective to combinations of a1, b1, g1, a2, b2, g2. Due to the symmetry
     # of the particle coordinates between particle 1 and 2, I have verified that these are the only second
     # order derivative functions needed. This is because the expressions for the coordinates of particle 2 use the same functions
     # with the arguments flipped. Thus only twelve functions are needed instead of thirty-six. Due to the symmetry of the partial
     # derivatives the square matrix of thirty-six values can be reduced to the upper triangular metrix. Of the twenty-one values in
     # upper triangular matrix symmetry of the particles allows for the number of functions to be further reduced to twelve
-    
     # For the remaining nine functions of the upper triangular matrix use:
     # da2D12b1 = db2D12a1(a2, b2, g2, a1, b1, g1)
 
@@ -6920,18 +6919,24 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
     def dg2D12g1(a1, b1, g1, a2, b2, g2):
         return -sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
 
-    # This function is to simplify the following function that generates the square matrix of spring potential terms (maybe?)
 
-    # Now that the necessary functions have been defined they can now be used to generate the spring potential terms
-    # found the in jacobian matrix used to solve the system of equations to determine the position and velocity at the
-    # next point in the trajectory of each particle. This function construct a square matrix of values that will be 
-    # included in the bottom left block of the complete jacobian.
+    ### Jacobian Helper Functions ###
+    # These functions are designed to streamline the process of populating the jacobian used by the Newton solver
+    # when evolving the system to the next time step.
+
+    ## Spring terms ##
+    # Use the D12 functions to generate the spring potential terms found the in jacobian matrix.
+    # This function construct a square matrix of values that will be included in the bottom left block of the complete jacobian.
+    # This is because they only involve derivatives with respect to the positions and not the velocities.
 
     def jacobi_sp_terms(mesh, mass_arr, spring_arr):
 
+        # This function returns the derivative with respect to x2 of the derivative with respect to x1 of the spring potential
+        # Where x can be taken to be a, b, or g
         def da2da1V12(m, f, sp_dat, d12, da1d12, da2d12, df, da2d12da1):
             return -sp_dat[0]/(m*f*sqrt( d12**2. - 1. ))*( (da1d12*da2d12)/sqrt( d12**2. - 1.) + ( arccosh(d12) - sp_dat[1] )*( da2d12da1 - da1d12*(df/f + d12*da2d12/(d12**2. - 1.)) ) )
 
+        # This function returns a nested list of the derivative values for each spring in the mesh
         def derivative_terms(part1,part2):
             a1, b1, g1=part1
             a2, b2, g2=part2
