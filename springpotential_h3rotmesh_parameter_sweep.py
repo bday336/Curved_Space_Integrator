@@ -6,6 +6,7 @@ from matplotlib import gridspec
 from matplotlib import animation, rc
 import numpy as np
 import copy as cp
+from mesh_bank import *
 from numpy import zeros,array,arange,sqrt,sin,cos,sinh,cosh,tanh,pi,arcsinh,arccosh,arctanh,arctan2,matmul,exp,identity,append,pi
 
 
@@ -19,43 +20,7 @@ for v in arange(1.,7.,1.): # max for each was set to 11 (1,11,1)    Stable regim
             print("On v={}, l={}, and k={}".format(v,l,k))
 
             # Manually generate mesh data
-            mesh=[ # Dumbbell mesh
-                [ # Vertex position 
-                    [l/2.,np.pi/2.,1.*np.pi/2.],      #particle 1
-                    [l/2.,np.pi/2.,3.*np.pi/2.]       #particle 2
-                ]
-                ,
-                [ # Edge connection given by vertex indices
-                    [0,1]
-                ]
-                ,
-                [ # Face given by the vertex indices (here for completeness)
-                    
-                ]
-            ]
-
-            # mesh=[ # Equilateral triangle mesh
-            #     # [ # Vertex position 
-            #     #     [.5,np.pi/2.,0.*2.*np.pi/3.],      #particle 1
-            #     #     [.5,np.pi/2.,1.*2.*np.pi/3.],      #particle 2
-            #     #     [.5,np.pi/2.,2.*2.*np.pi/3.]       #particle 3
-            #     # ]
-            #     [ # Vertex position (Analytic check)
-            #         [arccosh(cosh(l)/cosh(l/2.)),np.pi/2.,0.],      #particle 1
-            #         [l/2.,np.pi/2.,1.*np.pi/2.],                    #particle 2
-            #         [l/2.,np.pi/2.,3.*np.pi/2.]                     #particle 3
-            #     ]
-            #     ,
-            #     [ # Edge connection given by vertex indices
-            #         [0,1],
-            #         [0,2],
-            #         [1,2]
-            #     ]
-            #     ,
-            #     [ # Face given by the vertex indices (here for completeness)
-            #         [0,1,2]
-            #     ]
-            # ]
+            mesh=dumbbell_mesh(l)
 
             # Format mesh for use in the solver. Mainly about ordering the edge connection
             # array to make it easier to calculate the jacobian in solver. Have the lower
@@ -103,7 +68,7 @@ for v in arange(1.,7.,1.): # max for each was set to 11 (1,11,1)    Stable regim
 
             # Intialize the time stepping for the integrator.
             delT=.01
-            maxT=5+delT
+            maxT=3+delT
             nump=maxT/delT
             timearr=np.arange(0,maxT,delT)
 

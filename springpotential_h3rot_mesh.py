@@ -30,7 +30,7 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 # and rest length of the spring/edges between each vertex.
 
 # Manually generate mesh data
-mesh=dumbbell_mesh(1)
+mesh=equilateral_triangle_onaxis_mesh(1)
 
 # Format mesh for use in the solver. Mainly about ordering the edge connection
 # array to make it easier to calculate the jacobian in solver. Have the lower
@@ -78,7 +78,7 @@ for f in mesh[1]:
 
 # Intialize the time stepping for the integrator.
 delT=.01
-maxT=5+delT
+maxT=10+delT
 nump=maxT/delT
 timearr=np.arange(0,maxT,delT)
 
@@ -197,6 +197,7 @@ for i in range(len(gat)):
     grt.append(sinh(gat[i])*cos(gbt[i])/(cosh(gat[i]) + 1.))	
 
 # Save the time series data
+np.savetxt("dist6_data.csv",dist)
 # np.savetxt("dist12_data.csv",dist12) 
 # np.savetxt("dist13_data.csv",dist13) 
 # np.savetxt("dist23_data.csv",dist23)    	     		
@@ -244,45 +245,61 @@ for i in range(len(gat)):
 ### Uncomment to just plot trajectory in the Poincare disk model with distance plots ###
 # --------------------------------------------------------------------------------------
 
-# Plot Trajectory with error
-fig = plt.figure(figsize=(14,6))
+# # Plot Trajectory with error
+# fig = plt.figure(figsize=(14,6))
 
-ax1=fig.add_subplot(1,3,1,projection='3d')
+# ax1=fig.add_subplot(1,3,1,projection='3d')
 
-#draw sphere
-u, v = np.mgrid[0:np.pi+(np.pi)/15.:(np.pi)/15., 0:2.*np.pi+(2.*np.pi)/15.:(2.*np.pi)/15.]
-x = np.sin(u)*np.cos(v)
-y = np.sin(u)*np.sin(v)
-z = np.cos(u)
-ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
-ax1.set_xlim3d(-1,1)
-ax1.set_xlabel('X')
-ax1.set_ylim3d(-1,1)
-ax1.set_ylabel('Y')
-ax1.set_zlim3d(-1,1)
-ax1.set_zlabel('Z')
+# #draw sphere
+# u, v = np.mgrid[0:np.pi+(np.pi)/15.:(np.pi)/15., 0:2.*np.pi+(2.*np.pi)/15.:(2.*np.pi)/15.]
+# x = np.sin(u)*np.cos(v)
+# y = np.sin(u)*np.sin(v)
+# z = np.cos(u)
+# ax1.plot_wireframe(x, y, z, color="b", alpha=.1)
+# ax1.set_xlim3d(-1,1)
+# ax1.set_xlabel('X')
+# ax1.set_ylim3d(-1,1)
+# ax1.set_ylabel('Y')
+# ax1.set_zlim3d(-1,1)
+# ax1.set_zlabel('Z')
 
-# Particle Plot data
-part_plot=[]
-for a in range(vert_num):
-    part_plot.append(hypercirch3(array([sinh(gat[-(vert_num-a)])*sin(gbt[-(vert_num-a)])*cos(ggt[-(vert_num-a)]),sinh(gat[-(vert_num-a)])*sin(gbt[-(vert_num-a)])*sin(ggt[-(vert_num-a)]),sinh(gat[-(vert_num-a)])*cos(gbt[-(vert_num-a)]),cosh(gat[-(vert_num-a)])]),.1))
-    ax1.plot_surface(part_plot[-1][0], part_plot[-1][1], part_plot[-1][2], color="b")
+# # Particle Plot data
+# part_plot=[]
+# for a in range(vert_num):
+#     part_plot.append(hypercirch3(array([sinh(gat[-(vert_num-a)])*sin(gbt[-(vert_num-a)])*cos(ggt[-(vert_num-a)]),sinh(gat[-(vert_num-a)])*sin(gbt[-(vert_num-a)])*sin(ggt[-(vert_num-a)]),sinh(gat[-(vert_num-a)])*cos(gbt[-(vert_num-a)]),cosh(gat[-(vert_num-a)])]),.1))
+#     ax1.plot_surface(part_plot[-1][0], part_plot[-1][1], part_plot[-1][2], color="b")
 
-#draw trajectory
-for b in range(vert_num):
-    ax1.plot3D(gut[b::vert_num],gvt[b::vert_num],grt[b::vert_num], label="particle []".format(b))
-ax1.legend(loc= 'lower left')
+# #draw trajectory
+# for b in range(vert_num):
+#     ax1.plot3D(gut[b::vert_num],gvt[b::vert_num],grt[b::vert_num], label="particle []".format(b))
+# ax1.legend(loc= 'lower left')
 
-# ax1.plot_surface(part1x, part1y, part1z, color="b")
-# ax1.plot_surface(part2x, part2y, part2z, color="r")
-# ax1.plot_surface(part3x, part3y, part3z, color="k")
+# # ax1.plot_surface(part1x, part1y, part1z, color="b")
+# # ax1.plot_surface(part2x, part2y, part2z, color="r")
+# # ax1.plot_surface(part3x, part3y, part3z, color="k")
 
-# Displacement Plot
+# # Displacement Plot
+# # ax2=fig.add_subplot(1,3,2)
+
+# # ax2.plot(timearr,(dist12-spring_arr[0][1]),label="Spring 12 Displacement")
+# # ax2.plot(timearr,(dist13-spring_arr[1][1]),label="Spring 13 Displacement")
+# # ax2.plot(timearr,(dist23-spring_arr[2][1]),label="Spring 23 Displacement")
+# # #ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
+# # #ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
+# # #ax2.set_yscale("log",basey=10)	
+# # #ax2.set_ylabel('displacement (m)')
+# # ax2.set_xlabel('time (s)')
+# # ax2.legend(loc='lower right')
+
+# # Distance Plot
 # ax2=fig.add_subplot(1,3,2)
 
-# ax2.plot(timearr,(dist12-spring_arr[0][1]),label="Spring 12 Displacement")
-# ax2.plot(timearr,(dist13-spring_arr[1][1]),label="Spring 13 Displacement")
-# ax2.plot(timearr,(dist23-spring_arr[2][1]),label="Spring 23 Displacement")
+# for c in range(sp_num):
+#     ax2.plot(timearr,dist[c::sp_num],label="Spring [] Distance".format(c))
+
+# # ax2.plot(timearr,dist[0::3],label="Spring 12 Distance")
+# # ax2.plot(timearr,dist[1::3],label="Spring 13 Distance")
+# # ax2.plot(timearr,dist[2::3],label="Spring 23 Distance")
 # #ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
 # #ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
 # #ax2.set_yscale("log",basey=10)	
@@ -290,43 +307,27 @@ ax1.legend(loc= 'lower left')
 # ax2.set_xlabel('time (s)')
 # ax2.legend(loc='lower right')
 
-# Distance Plot
-ax2=fig.add_subplot(1,3,2)
-
-for c in range(sp_num):
-    ax2.plot(timearr,dist[c::sp_num],label="Spring [] Distance".format(c))
-
-# ax2.plot(timearr,dist[0::3],label="Spring 12 Distance")
-# ax2.plot(timearr,dist[1::3],label="Spring 13 Distance")
-# ax2.plot(timearr,dist[2::3],label="Spring 23 Distance")
-#ax2.axhline(y=spring[3]+sqrt(2.*1./spring[2]*.5*.5), color='b', linestyle='-')
-#ax2.axhline(y=((dist.max()-spring[3])+(dist.min()-spring[3]))/2., color='r', linestyle='-')
-#ax2.set_yscale("log",basey=10)	
-#ax2.set_ylabel('displacement (m)')
-ax2.set_xlabel('time (s)')
-ax2.legend(loc='lower right')
-
-# Energy Plot
-ax3=fig.add_subplot(1,3,3)
-
-ax3.plot(timearr,energy_dat,label="Energy")
-# ax3.set_yscale("log",basey=10)
-ax3.set_xlabel('time (s)')	
-ax3.legend(loc='lower right')
-
-# Force Plot
+# # Energy Plot
 # ax3=fig.add_subplot(1,3,3)
 
-# ax3.plot(timearr,(dist12-spring_arr[0][1])*spring_arr[0][0],label="Spring 12 Force")
-# ax3.plot(timearr,(dist13-spring_arr[1][1])*spring_arr[1][0],label="Spring 13 Force")
-# ax3.plot(timearr,(dist23-spring_arr[2][1])*spring_arr[2][0],label="Spring 23 Force")
+# ax3.plot(timearr,energy_dat,label="Energy")
 # # ax3.set_yscale("log",basey=10)
 # ax3.set_xlabel('time (s)')	
-# ax3.legend(loc='lower right')	
+# ax3.legend(loc='lower right')
 
-fig.tight_layout()	
+# # Force Plot
+# # ax3=fig.add_subplot(1,3,3)
 
-plt.show()
+# # ax3.plot(timearr,(dist12-spring_arr[0][1])*spring_arr[0][0],label="Spring 12 Force")
+# # ax3.plot(timearr,(dist13-spring_arr[1][1])*spring_arr[1][0],label="Spring 13 Force")
+# # ax3.plot(timearr,(dist23-spring_arr[2][1])*spring_arr[2][0],label="Spring 23 Force")
+# # # ax3.set_yscale("log",basey=10)
+# # ax3.set_xlabel('time (s)')	
+# # ax3.legend(loc='lower right')	
+
+# fig.tight_layout()	
+
+# plt.show()
 
 # ------------------------------------------------------------------
 ### Uncomment to just generate gif of trajectory of the particle ###
