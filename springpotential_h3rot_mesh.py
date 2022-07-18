@@ -29,8 +29,11 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 # array containing the data concerning the mass of each vertex, and values for stiffness
 # and rest length of the spring/edges between each vertex.
 
+# Parameters for convienence (if uniform throughout mesh)
+v, w, k, x = 1., 0., 1., 1.
+
 # Manually generate mesh data
-mesh=equilateral_triangle_onaxis_mesh(1)
+mesh=dumbbell_mesh(x)
 
 # Format mesh for use in the solver. Mainly about ordering the edge connection
 # array to make it easier to calculate the jacobian in solver. Have the lower
@@ -61,7 +64,7 @@ for c in range(vert_num):
 velocities=[]
 masses=[]
 for e in mesh[0]:
-    velocities.append(initial_con(e,1.,.0).tolist())
+    velocities.append(initial_con(e,v,w).tolist())
     masses.append(1.)
 
 # Generate parameter array (we will implicitly take all the vertices to have
@@ -72,7 +75,7 @@ for e in mesh[0]:
 sparr=[]
 for f in mesh[1]:
     sparr.append([
-        1.,
+        k,
         h3dist(convertpos_rot2hyph3(mesh[0][f[0]]),convertpos_rot2hyph3(mesh[0][f[1]]))
         ])
 
@@ -197,7 +200,7 @@ for i in range(len(gat)):
     grt.append(sinh(gat[i])*cos(gbt[i])/(cosh(gat[i]) + 1.))	
 
 # Save the time series data
-np.savetxt("dist6_data.csv",dist)
+np.savetxt("dist1_data.csv",dist)
 # np.savetxt("dist12_data.csv",dist12) 
 # np.savetxt("dist13_data.csv",dist13) 
 # np.savetxt("dist23_data.csv",dist23)    	     		

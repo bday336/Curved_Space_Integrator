@@ -6924,7 +6924,7 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
     # These functions are designed to streamline the process of populating the jacobian used by the Newton solver
     # when evolving the system to the next time step.
 
-    ## Spring terms ##
+    ## Jacobian Spring Terms ##
     # Use the D12 functions to generate the spring potential terms found the in jacobian matrix.
     # This function construct a square matrix of values that will be included in the bottom left block of the complete jacobian.
     # This is because they only involve derivatives with respect to the positions and not the velocities.
@@ -6940,16 +6940,16 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
         def derivative_terms(part1,part2):
             a1, b1, g1=part1
             a2, b2, g2=part2
-            # D function
+            # D12 function
             d12=D12(a1, b1, g1, a2, b2, g2)
-            # First derivatives of D function
+            # First derivatives of D12 function
             da1d12=da1D12(a1, b1, g1, a2, b2, g2)
             db1d12=db1D12(a1, b1, g1, a2, b2, g2)
             dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
             da2d12=da1D12(a2, b2, g2, a1, b1, g1)
             db2d12=db1D12(a2, b2, g2, a1, b1, g1)
             dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
-            # Second derivatives of D function
+            # Second derivatives of D12 function
             da1d12a1=da1D12a1(a1, b1, g1, a2, b2, g2)
             db1d12a1=db1D12a1(a1, b1, g1, a2, b2, g2)
             dg1d12a1=dg1D12a1(a1, b1, g1, a2, b2, g2)
@@ -6992,17 +6992,17 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             db2d12g2=dg2d12b2
             dg2d12g2 = dg1D12g1(a2, b2, g2, a1, b1, g1)
             return [
-                [ # D function
+                [ # D12 function
                     d12
                 ],
-                [ # First derivatives of D function
+                [ # First derivatives of D12 function
                     da1d12, 
                     db1d12, 
                     dg1d12, 
                     da2d12, 
                     db2d12, 
                     dg2d12],
-                [ # Second derivatives of D function
+                [ # Second derivatives of D12 function
                     [
                         da1d12a1,
                         db1d12a1,
@@ -7054,35 +7054,23 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
                 ]
             ]
 
+        # Generate array of derivative information for each spring
         spring_data=[]
-        # print("New spring terms data")
-        # print("positions")
-        # print(mesh[0])
-        # print("links")
-        # print(mesh[1])
-
         for a in mesh[1]:
             spring_data.append(derivative_terms(mesh[0][a[0]],mesh[0][a[1]]))
-        # print("Spring_Data")
-        # print(spring_data)
-        
-        # ### Spring 1-2 spring_arr[0]###
-        # sp12_darr=derivative_terms(positions[0],positions[1])
-        # ### Spring 1-3 spring_arr[1]###
-        # sp13_darr=derivative_terms(positions[0],positions[2])
-        # ### Spring 2-3 spring_arr[2]###
-        # sp23_darr=derivative_terms(positions[1],positions[2])
 
-        # spring_matrix=[]
-        # for b in range(3*len(mesh[0])):
-        #     spring_matrix.append([])
-        #     for c in range(3*len(mesh[0])):
-        #         spring_matrix[-1].append([])
-        spring_matrix=zeros((3*len(mesh[0]),3*len(mesh[0]))) # initialize as matrix of zeros in case no spring between vertices
+        # Generate matrix of spring terms that will be added to bottom left
+        # submatrix of jacobian. Matrix Initialized with zeros for places where
+        # there is no contributions from springs. (when there is no spring between
+        # two given vertices)
+        spring_matrix=zeros((3*len(mesh[0]),3*len(mesh[0])))
 
-        sp_count=0
-
+        # Populate spring matrix for each edge in the mesh. This is gone by adding the
+        # contribution of successive springs to its corresponding elements of the matrix.
+        # Each element is the column derivative of the row derivative of the potential. Thus
+        # each edge contributes four block submatrices due to symmetry of the potential.
         for b in mesh[1]:
+            sp_count=mesh[1].index(b)
             spring_matrix[3*b[0]+0][3*b[0]+0]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][0], 0., spring_data[sp_count][2][0][0])
             spring_matrix[3*b[0]+0][3*b[0]+1]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][1], 0., spring_data[sp_count][2][0][1])
             spring_matrix[3*b[0]+0][3*b[0]+2]+=da2da1V12(mass_arr[b[0]], 1., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][0], spring_data[sp_count][1][2], 0., spring_data[sp_count][2][0][2])
@@ -7133,25 +7121,22 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             spring_matrix[3*b[1]+2][3*b[1]+0]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][3], sinh(2.*mesh[0][b[1]][0])*sin(mesh[0][b[1]][1])**2., spring_data[sp_count][2][5][3])
             spring_matrix[3*b[1]+2][3*b[1]+1]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][4], sin(2.*mesh[0][b[1]][1])*sinh(mesh[0][b[1]][0])**2., spring_data[sp_count][2][5][4])
             spring_matrix[3*b[1]+2][3*b[1]+2]+=da2da1V12(mass_arr[b[1]], sinh(mesh[0][b[1]][0])**2.*sin(mesh[0][b[1]][1])**2., spring_arr[sp_count], spring_data[sp_count][0][0], spring_data[sp_count][1][5], spring_data[sp_count][1][5], 0.,                                                  spring_data[sp_count][2][5][5])
-
-            sp_count+=1
-
-
-
         
-
         return spring_matrix
 
-    # This function is to simplify the following function that generates the square matrix of energy terms for the jacobian
+    ## Jacobian Energy Terms ##
+    # Use the D12 functions to generate the energy terms found the in jacobian matrix.
+    # This function construct an array of values that will be included in the bottom row of the complete jacobian.
 
     def jacobi_energy_terms(mesh, velocities, mass_arr, spring_arr):
 
+        # This function returns a nested list of the derivative values for each spring in the mesh
         def derivative_terms(part1,part2):
             a1, b1, g1=part1
             a2, b2, g2=part2
-            # D function
+            # D12 function
             d12=D12(a1, b1, g1, a2, b2, g2)
-            # First derivatives of D function
+            # First derivatives of D12 function
             da1d12=da1D12(a1, b1, g1, a2, b2, g2)
             db1d12=db1D12(a1, b1, g1, a2, b2, g2)
             dg1d12=dg1D12(a1, b1, g1, a2, b2, g2)
@@ -7159,10 +7144,10 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             db2d12=db1D12(a2, b2, g2, a1, b1, g1)
             dg2d12=dg1D12(a2, b2, g2, a1, b1, g1)
             return [
-                [ # D function
+                [ # D12 function
                     d12
                 ],
-                [ # First derivatives of D function
+                [ # First derivatives of D12 function
                     da1d12, 
                     db1d12, 
                     dg1d12, 
@@ -7172,34 +7157,27 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
                 ]
             ]
 
+        # Generate array of derivative information for each spring
         spring_data=[]
-        # print(mesh)
-
         for a in mesh[1]:
-            # print(a)
             spring_data.append(derivative_terms(mesh[0][a[0]],mesh[0][a[1]]))
-        # print("Spring_Data")
-        # print(spring_data)
-        
-        # ### Spring 1-2 spring_arr[0]###
-        # sp12_darr=derivative_terms(positions[0],positions[1])
-        # ### Spring 1-3 spring_arr[1]###
-        # sp13_darr=derivative_terms(positions[0],positions[2])
-        # ### Spring 2-3 spring_arr[2]###
-        # sp23_darr=derivative_terms(positions[1],positions[2])
 
-        # energy_vector=[]
-        # for c in range(3*2*len(mesh[0])):
-        #         energy_vector.append([])
+        # Generate array of energy terms that will be added to bottom row of jacobian. 
+        # Array initialized with zeros for times when energy of potential is zero.
         energy_vector=(zeros((1,3*2*len(mesh[0])))[0]).tolist()
 
+        # Populate energy array for each vertex in the mesh. This is gone by adding the
+        # contribution of successive energies to its corresponding elements of the array.
+        # Each element is the column direvative of the total energy of each point mass.
+        # The energy consists of kinetic energy of the point mass plus each spring potential
+        # contribution.
         for b in range(len(mesh[0])):
-            # position terms (kinetic energy)
+            # Position Derivative Terms (kinetic energy)
             energy_vector[3*b+0]-=mass_arr[b]*sinh(mesh[0][b][0])*cosh(mesh[0][b][0])*( velocities[b][1]**2. + sin(mesh[0][b][1])**2.*velocities[b][2]**2. )
             energy_vector[3*b+1]-=mass_arr[b]*sin(mesh[0][b][1])*cos(mesh[0][b][1])*velocities[b][2]**2.
             energy_vector[3*b+2]-=mass_arr[b]*0. 
 
-            # position terms (potential energy)
+            # Position Derivative Terms (potential energy)
             for c in mesh[1]:
                 if b in c:
                     spring_index=mesh[1].index(c)
@@ -7212,137 +7190,27 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
                         energy_vector[3*b+1]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][4] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
                         energy_vector[3*b+2]-=spring_arr[spring_index][0]*( arccosh(spring_data[spring_index][0][0]) - spring_arr[spring_index][1] )*( spring_data[spring_index][1][5] / sqrt((spring_data[spring_index][0][0])**2. - 1.) )
 
-            # velocity terms
+            # Velocity Derivative Terms
             energy_vector[3*(b+len(mesh[0]))+0]-=mass_arr[b]*velocities[b][0]
             energy_vector[3*(b+len(mesh[0]))+1]-=mass_arr[b]*sinh(mesh[0][b][0])**2.*velocities[b][1]
             energy_vector[3*(b+len(mesh[0]))+2]-=mass_arr[b]*sin(mesh[0][b][1])**2.*velocities[b][2]
 
         return energy_vector
 
+    ### Jacobian ###
+    # This is the function used to generate the jacobian for the dynamical system being evolved
+    # which is inverted when evaluating the root solver.
 
-   
-    def con1(base_pos, base_pos_guess, base_vel, base_vel_guess, h):
-        an,bn,gn=base_pos
-        an1,bn1,gn1=base_pos_guess
-        adn,bdn,gdn=base_vel
-        adn1,bdn1,gdn1=base_vel_guess
-        return an1 - an - .5*h*(adn + adn1)
-
-    def con2(base_pos, base_pos_guess, base_vel, base_vel_guess, h):
-        an,bn,gn=base_pos
-        an1,bn1,gn1=base_pos_guess
-        adn,bdn,gdn=base_vel
-        adn1,bdn1,gdn1=base_vel_guess
-        return bn1 - bn - .5*h*(bdn + bdn1)
-
-    def con3(base_pos, base_pos_guess, base_vel, base_vel_guess, h): 
-        an,bn,gn=base_pos
-        an1,bn1,gn1=base_pos_guess
-        adn,bdn,gdn=base_vel
-        adn1,bdn1,gdn1=base_vel_guess
-        return gn1 - gn - .5*h*(gdn + gdn1)        
-
-    def con4(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
-        def geo_spring_term_ad(a1, b1, g1, a2, b2, g2, m, sp12):
-            return (-sp12[0]/(m*1.)*( 
-            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
-            (sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
-            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.))
-
-
-        a1n,b1n,g1n=base_pos
-        a1n1,b1n1,g1n1=base_pos_guess
-        ad1n,bd1n,gd1n=base_vel
-        ad1n1,bd1n1,gd1n1=base_vel_guess
-
-        nval=(bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n)
-        n1val=(bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1)
-        # print("bacon")
-        # print(meshn[0])
-
-        for a in spokes_conn_list:
-            axn,bxn,gxn=meshn[0][a[0]]
-            nval+=geo_spring_term_ad(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
-            axn1,bxn1,gxn1=meshn1[0][a[0]]
-            n1val+=geo_spring_term_ad(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
-
-        return (ad1n1 - ad1n - .5*h*(nval+n1val))
-
-    def con5(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
-        def geo_spring_term_bd(a1, b1, g1, a2, b2, g2, m, sp12):
-            return (-sp12[0]/(m*sinh(a1)*sinh(a1))*( 
-            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
-            (sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
-            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
-
-        a1n,b1n,g1n=base_pos
-        a1n1,b1n1,g1n1=base_pos_guess
-        ad1n,bd1n,gd1n=base_vel
-        ad1n1,bd1n1,gd1n1=base_vel_guess
-
-        nval=gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n)
-        n1val=gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1)
-
-        for a in spokes_conn_list:
-            axn,bxn,gxn=meshn[0][a[0]]
-            nval+=geo_spring_term_bd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
-            axn1,bxn1,gxn1=meshn1[0][a[0]]
-            n1val+=geo_spring_term_bd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
-
-        return (bd1n1 - bd1n - .5*h*(nval+n1val))
-
-    def con6(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
-        def geo_spring_term_gd(a1, b1, g1, a2, b2, g2, m, sp12):
-            return (-sp12[0]/(m*sinh(a1)*sinh(a1)*sin(b1)*sin(b1))*( 
-            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
-            (sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2))/sqrt(-1. + 
-            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
-
-        a1n,b1n,g1n=base_pos
-        a1n1,b1n1,g1n1=base_pos_guess
-        ad1n,bd1n,gd1n=base_vel
-        ad1n1,bd1n1,gd1n1=base_vel_guess
-
-        nval=-2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n)
-        n1val=-2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1)
-
-        for a in spokes_conn_list:
-            axn,bxn,gxn=meshn[0][a[0]]
-            nval+=geo_spring_term_gd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
-            axn1,bxn1,gxn1=meshn1[0][a[0]]
-            n1val+=geo_spring_term_gd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
-
-        return (gd1n1 - gd1n - .5*h*(nval+n1val))
-    
-    def con7(positions, velocities, mass_arr, spring_arr, energy):
-
-        def D12(part1, part2):
-            a1, b1, g1=part1
-            a2, b2, g2=part2
-            return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
-
-        enval=0.
-
-        # Kinetic Energy
-        for a in range(len(positions)):
-            ax,bx,gx=positions[a]
-            adx,bdx,gdx=velocities[a]
-            enval+=.5*mass_arr[a]*( adx**2. + sinh(ax)**2.*bdx**2. + sinh(ax)**2.*sin(bx)**2.*gdx**2. )
-
-        # Potential Energy
-        for b in mesh[1]:
-            enval+=.5*spring_arr[mesh[1].index(b)][0]*( arccosh(D12(positions[b[0]],positions[b[1]])) - spring_arr[mesh[1].index(b)][1] )**2.
-
-        return (energy - enval)
-
-
-    
     def jacobian(positions, velocities, mass_arr, h, spring_arr, mesh):
+
+        # Function that returns matrix of derivatives of the geodesic
+        # terms of the update equations (Christoffel symbols for velocity
+        # update equations)
         def geo_term_arr(pos, vel, h):
             a1,b1,g1=pos
             ad1,bd1,gd1=vel
             return [
-                [ # position submatrix
+                [ # position submatrix (derivatives with respect to position)
                     [   # a1, b1, g1 derivatives of adn1 update constraint
                         -.5*h*(bd1*bd1+sin(b1)*sin(b1)*gd1*gd1)*cosh(2.*a1),
                         -.25*h*sinh(2.*a1)*sin(2.*b1)*gd1*gd1,
@@ -7359,7 +7227,7 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
                         0.
                     ],
                 ],
-                [ # velocity submatrix
+                [ # velocity submatrix (derivatives with respect to velocity)
                     [   # ad1, bd1, gd1 derivatives of adn1 update constraint
                         1.,
                         -.5*h*sinh(2.*a1)*bd1,
@@ -7378,57 +7246,180 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
                 ]
             ]
 
-        # Terms from geodesic equations
+        # Generate array of derivative information from Christoffel symbols
         geo_arr=[]
         for a in range(len(positions)):
             geo_arr.append(geo_term_arr(positions[a], velocities[a], h))
-        # print("Positions")
-        # print(positions)
-        # print("velocities")
-        # print(velocities)
-        
-        # for b in range(len(geo_arr)):
-        #     geo_arr[b].append(geo_term_arr(positions[b], velocities[b], h))
-        # print("Geo_terms")
-        # print(geo_arr)
 
-        # Terms from spring values
+        # Generate matrix of spring terms
         spring_terms=jacobi_sp_terms(mesh, mass_arr, spring_arr)
-        # print("Spring_terms")
-        # print(spring_terms)
 
-        # Terms from energy values
+        # Generate array of energy terms
         energy_terms=jacobi_energy_terms(mesh, velocities, mass_arr, spring_arr)
-        # print("Energy_terms")
-        # print(energy_terms)
 
-        # Contruct the matrix
+        # Contruct the total jacobian matrix
         jmat=zeros((3*len(positions)+3*len(velocities)+1,3*len(positions)+3*len(velocities)+1))
 
         # Build upper half of matrix
-        iden_half=identity(3*len(positions))
+        iden_half=identity(3*len(positions))                    # Upper left block of jacobian
         jmat[0:3*len(positions),0:3*len(positions)]=iden_half
 
-        h_half=-.5*h*identity(3*len(velocities))
+        h_half=-.5*h*identity(3*len(velocities))                # Upper right block of jacobian
         jmat[0:3*len(velocities),0+3*len(velocities):3*len(velocities)+3*len(velocities)]=h_half
 
         # Build lower half of matrix
-        # Geodesic terms
+        # Include terms from Christoffel symbol derivatives
         for c in range(len(positions)):
             # geodesic term for positions (lower left block diagonal)
             jmat[3*len(positions)+3*c:3*len(positions)+3+3*c,0+3*c:3+3*c]=geo_arr[c][0]
             # geodesic term for velocities (lower right block diagonal)
             jmat[3*len(positions)+3*c:3*len(positions)+3+3*c,0+3*len(positions)+3*c:3+3*len(positions)+3*c]=geo_arr[c][1]
 
-        # Spring terms
+        # Include spring terms
         jmat[3*len(positions):2*3*len(positions),0:3*len(positions)]=np.add(jmat[3*len(positions):2*3*len(positions),0:3*len(positions)],spring_terms)
 
-        # Energy terms
+        # Include energy terms
         jmat[-1,:]=energy_terms+[1.]
 
         return jmat
 
+    ### Constraint Equations ###
+    # These are the equations that are being used by the Newton root solver. They
+    # constitute a system of coupled ODE equations. The solver implies an implcit
+    # trapezoidal method in solving the system and thus requires the use of the
+    # Newton root solver to determine the n+1 value of the trajectory.
+   
+   # Position update constraint for a coordinate
+    def con1(base_pos, base_pos_guess, base_vel, base_vel_guess, h):
+        an,bn,gn=base_pos
+        an1,bn1,gn1=base_pos_guess
+        adn,bdn,gdn=base_vel
+        adn1,bdn1,gdn1=base_vel_guess
+        return an1 - an - .5*h*(adn + adn1)
+
+    # Position update constraint for b coordinate
+    def con2(base_pos, base_pos_guess, base_vel, base_vel_guess, h):
+        an,bn,gn=base_pos
+        an1,bn1,gn1=base_pos_guess
+        adn,bdn,gdn=base_vel
+        adn1,bdn1,gdn1=base_vel_guess
+        return bn1 - bn - .5*h*(bdn + bdn1)
+
+    # Position update constraint for g coordinate
+    def con3(base_pos, base_pos_guess, base_vel, base_vel_guess, h): 
+        an,bn,gn=base_pos
+        an1,bn1,gn1=base_pos_guess
+        adn,bdn,gdn=base_vel
+        adn1,bdn1,gdn1=base_vel_guess
+        return gn1 - gn - .5*h*(gdn + gdn1)        
+
+    # Velocity update constraint for a coordinate
+    def con4(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
+        
+        # Helper function to generate spring force constribution
+        def geo_spring_term_ad(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*1.)*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*cosh(a2) - cosh(a1)*cos(b1)*sinh(a2)*cos(b2) - cosh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.))
+
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        nval=(bd1n*bd1n + gd1n*gd1n*sin(b1n)**2.)*sinh(a1n)*cosh(a1n)
+        n1val=(bd1n1*bd1n1 + gd1n1*gd1n1*sin(b1n1)**2.)*sinh(a1n1)*cosh(a1n1)
+
+        # Cycle over the springs connected to base point to include spring force
+        for a in spokes_conn_list:
+            axn,bxn,gxn=meshn[0][a[0]]
+            nval+=geo_spring_term_ad(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
+            axn1,bxn1,gxn1=meshn1[0][a[0]]
+            n1val+=geo_spring_term_ad(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
+
+        return (ad1n1 - ad1n - .5*h*(nval+n1val))
+
+    # Velocity update constraint for b coordinate
+    def con5(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
+        
+        # Helper function to generate spring force constribution
+        def geo_spring_term_bd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*cos(b2) - sinh(a1)*cos(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        nval=gd1n*gd1n*sin(b1n)*cos(b1n) - 2.*ad1n*bd1n/tanh(a1n)
+        n1val=gd1n1*gd1n1*sin(b1n1)*cos(b1n1) - 2.*ad1n1*bd1n1/tanh(a1n1)
+
+        # Cycle over the springs connected to base point to include spring force
+        for a in spokes_conn_list:
+            axn,bxn,gxn=meshn[0][a[0]]
+            nval+=geo_spring_term_bd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
+            axn1,bxn1,gxn1=meshn1[0][a[0]]
+            n1val+=geo_spring_term_bd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
+
+        return (bd1n1 - bd1n - .5*h*(nval+n1val))
+
+    # Velocity update constraint for g coordinate
+    def con6(base_pos, base_pos_guess, spokes_conn_list, base_vel, base_vel_guess, m1, h, sp_arr, meshn, meshn1):
+        
+        # Helper function to generate spring force constribution
+        def geo_spring_term_gd(a1, b1, g1, a2, b2, g2, m, sp12):
+            return (-sp12[0]/(m*sinh(a1)*sinh(a1)*sin(b1)*sin(b1))*( 
+            arccosh(cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)) - sp12[1])*
+            (sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*sin(g1 - g2))/sqrt(-1. + 
+            (cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2))**2.)) 
+
+        a1n,b1n,g1n=base_pos
+        a1n1,b1n1,g1n1=base_pos_guess
+        ad1n,bd1n,gd1n=base_vel
+        ad1n1,bd1n1,gd1n1=base_vel_guess
+
+        nval=-2.*ad1n*gd1n/tanh(a1n) - 2.*bd1n*gd1n/tan(b1n)
+        n1val=-2.*ad1n1*gd1n1/tanh(a1n1) - 2.*bd1n1*gd1n1/tan(b1n1)
+
+        # Cycle over the springs connected to base point to include spring force
+        for a in spokes_conn_list:
+            axn,bxn,gxn=meshn[0][a[0]]
+            nval+=geo_spring_term_gd(a1n, b1n, g1n, axn, bxn, gxn, m1, sp_arr[a[1]])
+            axn1,bxn1,gxn1=meshn1[0][a[0]]
+            n1val+=geo_spring_term_gd(a1n1, b1n1, g1n1, axn1, bxn1, gxn1, m1, sp_arr[a[1]])
+
+        return (gd1n1 - gd1n - .5*h*(nval+n1val))
+    
+    # Energy conservation constraint for total system
+    def con7(positions, velocities, mass_arr, spring_arr, energy):
+
+        def D12(part1, part2):
+            a1, b1, g1=part1
+            a2, b2, g2=part2
+            return cosh(a1)*cosh(a2) - sinh(a1)*cos(b1)*sinh(a2)*cos(b2) - sinh(a1)*sin(b1)*sinh(a2)*sin(b2)*cos(g1 - g2)
+
+        enval=0.
+
+        # Kinetic energy contribution from all vertices
+        for a in range(len(positions)):
+            ax,bx,gx=positions[a]
+            adx,bdx,gdx=velocities[a]
+            enval+=.5*mass_arr[a]*( adx**2. + sinh(ax)**2.*bdx**2. + sinh(ax)**2.*sin(bx)**2.*gdx**2. )
+
+        # Potential energy contribution from all edges
+        for b in mesh[1]:
+            enval+=.5*spring_arr[mesh[1].index(b)][0]*( arccosh(D12(positions[b[0]],positions[b[1]])) - spring_arr[mesh[1].index(b)][1] )**2.
+
+        return (energy - enval)
+
+    ###############################
     ### Start of body of solver ###
+    ###############################
 
     # Extract mesh information for indexing moving forward
     vert_num=len(mesh[0])
@@ -7444,31 +7435,23 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
 
     # Generate the array of constraints for Newton root solver
     constraint_arr=[]
-    # Position updates
+    # Position update constriants
     for a in range(vert_num):
         constraint_arr.append(con1(input_mesh[0][a], input_mesh[0][a], input_velarr[a], input_velarr[a], step))
         constraint_arr.append(con2(input_mesh[0][a], input_mesh[0][a], input_velarr[a], input_velarr[a], step))
         constraint_arr.append(con3(input_mesh[0][a], input_mesh[0][a], input_velarr[a], input_velarr[a], step))
 
-    # Velocity updates
+    # Velocity update constraints
     for b in range(vert_num):
         constraint_arr.append(con4(input_mesh[0][b], input_mesh[0][b], conn_list[b], input_velarr[b], input_velarr[b], mass_arr[b], step, spring_arr, input_mesh, input_mesh))
         constraint_arr.append(con5(input_mesh[0][b], input_mesh[0][b], conn_list[b], input_velarr[b], input_velarr[b], mass_arr[b], step, spring_arr, input_mesh, input_mesh))
         constraint_arr.append(con6(input_mesh[0][b], input_mesh[0][b], conn_list[b], input_velarr[b], input_velarr[b], mass_arr[b], step, spring_arr, input_mesh, input_mesh))
 
-    # Energy update
+    # Energy conservation constraint
     constraint_arr.append(con7(input_mesh[0], input_velarr, mass_arr, spring_arr, energy))
-    
 
-
-    # print(jacobian(pos1n[0], pos1n[1], pos1n[2], pos2n[0], pos2n[1], pos2n[2], vel1n[0], vel1n[1], vel1n[2], vel2n[0], vel2n[1], vel2n[2], m1, m2, step, sprcon, eqdist)[6:,:])
-    # print("initial Jacobian")
-    # print(array(jacobian(mesh[0], veln_arr, mass_arr, step, spring_arr, mesh),dtype=np.float))
-    # print("constraint_arrary")
-    # print(-array(constraint_arr,dtype=np.float))
+    # Run zeroth iteration of the Newton root solver
     diff1=linalg.solve(array(jacobian(input_mesh[0], input_velarr, mass_arr, step, spring_arr, input_mesh),dtype=np.float),-array(constraint_arr,dtype=np.float))
-    # print("Diff1")
-    # print(diff1)
     val1=diff1.copy()
     # Position updates
     for c in range(vert_num):
@@ -7485,14 +7468,12 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
     # Energy update
     val1[-1]+=energy
 
-    # print("Initial constaint arr")
-    # print(-array(constraint_arr))
-    # print("initial val1")
-    # print(val1)
-
-
-    x = 0
-    while(x < 7):
+    # Run remaining iterations of the Newton root solver
+    # The number of iterations has been hard coded to be 
+    # seven since that is when convergence has occurred for
+    # test trajectories. (Can be made more rigorous)
+    x = 1           # Iteration number
+    while(x < 8):
         # Values from the results of the previous root iteration
         new_pos_arr=[]
         new_vel_arr=[]
@@ -7500,51 +7481,34 @@ def imph3sprot_mesh(mesh, veln_arr, step, mass_arr, spring_arr, energy, conn_lis
             new_pos_arr.append(val1[0+3*e:3+3*e])
             new_vel_arr.append(val1[3*vert_num+3*e:3+3*vert_num+3*e])
         new_energy=val1[-1]
-        # print("initial_pos_arr")
-        # print(mesh[0])
-        # print("new_pos_arr")
-        # print(new_pos_arr)
-        # print("initial_vel_arr")
-        # print(veln_arr)
-        # print("new_vel_arr")
-        # print(new_vel_arr)
 
         # Update the current version of the mesh and velocity array
         solver_mesh[0]=new_pos_arr
         solver_velarr=new_vel_arr
-        # print("new_mesh")
-        # print(solver_mesh)
 
         # Generate the new array of constraints
         new_constraint_arr=[]
-        # Position updates
+        # Position update constraints
         for f in range(vert_num):
             new_constraint_arr.append(con1(input_mesh[0][f], solver_mesh[0][f], input_velarr[f], solver_velarr[f], step))
             new_constraint_arr.append(con2(input_mesh[0][f], solver_mesh[0][f], input_velarr[f], solver_velarr[f], step))
             new_constraint_arr.append(con3(input_mesh[0][f], solver_mesh[0][f], input_velarr[f], solver_velarr[f], step))
 
-        # Velocity updates
+        # Velocity update constraints
         for g in range(vert_num):
             new_constraint_arr.append(con4(input_mesh[0][g], solver_mesh[0][g], conn_list[g], input_velarr[g], solver_velarr[g], mass_arr[g], step, spring_arr, input_mesh, solver_mesh))
             new_constraint_arr.append(con5(input_mesh[0][g], solver_mesh[0][g], conn_list[g], input_velarr[g], solver_velarr[g], mass_arr[g], step, spring_arr, input_mesh, solver_mesh))
             new_constraint_arr.append(con6(input_mesh[0][g], solver_mesh[0][g], conn_list[g], input_velarr[g], solver_velarr[g], mass_arr[g], step, spring_arr, input_mesh, solver_mesh))
 
-        # Energy update
+        # Energy conservation constraint
         new_constraint_arr.append(con7(solver_mesh[0], solver_velarr, mass_arr, spring_arr, new_energy))
 
+        # Run x-th iteration of the Newton root solver
         diff2=linalg.solve(array(jacobian(solver_mesh[0], solver_velarr, mass_arr, step, spring_arr, solver_mesh),dtype=np.float),-array(new_constraint_arr,dtype=np.float))
         val2=np.add(array(val1),array(diff2)).tolist()   
         val1 = val2
-        # print("jacobian")
-        # print(jacobian(new_pos_arr, new_vel_arr, mass_arr, step, spring_arr, new_mesh))
-        # print("constraint_Arr")
-        # print(-array(new_constraint_arr))
-        # print("val1")
-        # print(val1)
         x=x+1
-    #print(val1[9:17])
-    # print("Val1")
-    # print(val1)
+
     return val1
 
 #########################################################
