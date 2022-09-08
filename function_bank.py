@@ -27,6 +27,9 @@ def convert_rot2transh2(rot_vec):
 def convert_rot2transh3(rot_vec):
 	return array([arcsinh(sinh(rot_vec[0])*sin(rot_vec[1])*cos(rot_vec[2])), arcsinh(sinh(rot_vec[0])*sin(rot_vec[1])*sin(rot_vec[2])/cosh(arcsinh(sinh(rot_vec[0])*sin(rot_vec[1])*cos(rot_vec[2])))), arctanh(tanh(rot_vec[0])*cos(rot_vec[1]))])
 
+def convert_trans2roth3(trans_vec):
+	return array([arccosh(cosh(trans_vec[0])*cosh(trans_vec[1])*cosh(trans_vec[2])), arccos(cosh(trans_vec[0])*cosh(trans_vec[1])*sinh(trans_vec[2])/sinh(arccosh(cosh(trans_vec[0])*cosh(trans_vec[1])*cosh(trans_vec[2])))), arctan2(sinh(trans_vec[1])/tanh(trans_vec[0]))])
+
 def convert_rot2transh2e(rot_vec):
    return array([arcsinh(sinh(rot_vec[0])*cos(rot_vec[1])), arctanh(tanh(rot_vec[0])*sin(rot_vec[1])), rot_vec[2]])
 
@@ -36,6 +39,14 @@ def convert_rot2transh2e(rot_vec):
 def convert_rot2transh2vel(rot_pos,rot_vel):
    trans_pos=convert_rot2transh2(rot_pos)
    return array([(rot_vel[0]*cosh(rot_pos[0])*cos(rot_pos[1])-rot_vel[1]*sinh(rot_pos[0])*sin(rot_pos[1]))/(cosh(trans_pos[0])), (rot_vel[0]*(cosh(rot_pos[0])*sin(rot_pos[1])*cosh(trans_pos[1])-sinh(rot_pos[0])*sinh(trans_pos[1]))+rot_vel[1]*sinh(rot_pos[0])*cos(rot_pos[1])*cosh(trans_pos[1]))/(cosh(trans_pos[0]))])
+
+def convertvel_trans2roth3(trans_pos,trans_vel):
+   rot_pos=convert_trans2roth3(trans_pos)
+   ad=( trans_vel[0]*sinh(trans_pos[0])*cosh(trans_pos[1])*cosh(trans_pos[2]) + trans_vel[1]*cosh(trans_pos[0])*sinh(trans_pos[1])*cosh(trans_pos[2]) + trans_vel[2]*cosh(trans_pos[0])*cosh(trans_pos[1])*sinh(trans_pos[2]) )/sinh(rot_pos[0])
+   bd=( ad*cosh(rot_pos[0])*cos(rot_pos[1]) - trans_vel[0]*sinh(trans_pos[0])*cosh(trans_pos[1])*sinh(trans_pos[2]) - trans_vel[1]*cosh(trans_pos[0])*sinh(trans_pos[1])*sinh(trans_pos[2]) + trans_vel[2]*cosh(trans_pos[0])*cosh(trans_pos[1])*cosh(trans_pos[2]) )/(sinh(rot_pos[0])*sin(rot_pos[1]))   
+   gd=( ad*cosh(rot_pos[0])*sin(rot_pos[1])*cos(rot_pos[2]) + bd*sinh(rot_pos[0])*cos(rot_pos[1])*cos(rot_pos[2]) - trans_vel[0]*cosh(trans_pos[0]) )/(sinh(rot_pos[0])*sin(rot_pos[1])*sin(rot_pos[2]))
+   return array([ad,bd,gd])
+
 
 # Convert from hyperboloid model to translational parameterization (H2 position)
 
@@ -57,6 +68,7 @@ def convertpos_rot2hyph3(rot_vec):
 
 def convertpos_hyp2roth3(hyp_vec):
    return array([arccosh(hyp_vec[3]),arccos(hyp_vec[2]/sinh(arccosh(hyp_vec[3]))),arctan2(hyp_vec[1],hyp_vec[0])])
+
 
 # Distance functions
 
@@ -260,6 +272,7 @@ def collisionh2(pos1,pos2,vel1,vel2,mass1,mass2,dist):
 # Potentially can look into make correction for when the distance is less than the combined radii of the spheres
 # maybe add a tolerance to help?
 # maybe add correction to placement when the midpoint is centered at origin so that the COMs are the same distance from it? <- done
+# Takes in the position and velocity of the particles in the translational parameterization
 def collisionh3(pos1,pos2,vel1,vel2,mass1,mass2,dist):
     pos1hyp=array([
         sinh(pos1[0]),
@@ -309,7 +322,9 @@ def collisionh3(pos1,pos2,vel1,vel2,mass1,mass2,dist):
     newvel2= rotxh3(arctan2(pos1hyp[2],pos1hyp[1])) @ rotzh3(arctan2(trans12xyp1[1],trans12xyp1[0])) @ boostxh3(arccosh(trans12xyp1[3])) @ rotzh3(-arctan2(trans12xyp1[1],trans12xyp1[0])) @ rotxh3(-arctan2(pos1hyp[2],pos1hyp[1])) @ rotxh3(arctan2(trans12op2[2],trans12op2[1])) @ rotzh3(arctan2(trans22xyp2[1],trans22xyp2[0])) @ boostxh3(.5*dist) @ boostxh3(-arccosh(transm2op1[3])) @ postcolv2
     newvelpara1= array([newvel1[0]/cosh(pos1[0]),(newvel1[1]-newvel1[0]*tanh(pos1[0])*sinh(pos1[1]))/(cosh(pos1[0]*cosh(pos1[1]))),(newvel1[2]*cosh(pos1[2])-newvel1[3]*sinh(pos1[2]))/(cosh(pos1[0]*cosh(pos1[1])))])
     newvelpara2= array([newvel2[0]/cosh(pos2[0]),(newvel2[1]-newvel2[0]*tanh(pos2[0])*sinh(pos2[1]))/(cosh(pos2[0]*cosh(pos2[1]))),(newvel2[2]*cosh(pos2[2])-newvel2[3]*sinh(pos2[2]))/(cosh(pos2[0]*cosh(pos2[1])))])
-    return newvelpara1,newvelpara2
+    newrotvel1=convertvel_trans2roth3(pos1,newvel1)
+    newrotvel2=convertvel_trans2roth3(pos2,newvel2)
+    return newrotvel1,newrotvel2
 
 # Potentially can look into make correction for when the distance is less than the combined radii of the spheres
 # maybe add a tolerance to help?

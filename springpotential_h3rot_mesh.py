@@ -1,4 +1,5 @@
 from asyncio import new_event_loop
+from dbm import dumb
 from symint_bank import imph3sprot3,imph3sprot3_condense_econ, imph3sprot_mesh
 from function_bank import hyper2poinh3,h3dist,boostxh3,rotxh3,rotyh3,rotzh3,hypercirch3,collisionh3,convertpos_hyp2roth3,convertpos_rot2hyph3,initial_con
 from mpl_toolkits.mplot3d import Axes3D
@@ -30,7 +31,7 @@ from numpy import zeros,array,arange,sqrt,sin,cos,tan,sinh,cosh,tanh,pi,arcsinh,
 # and rest length of the spring/edges between each vertex.
 
 # Parameters for convienence (if uniform throughout mesh)
-v, w, k, x = 1., 0., 1., 1.
+v, w, k, x = 1., 0., 10., 10.
 
 # Manually generate mesh data
 mesh=dumbbell_mesh(x)
@@ -81,7 +82,7 @@ for f in mesh[1]:
 
 # Intialize the time stepping for the integrator.
 delT=.01
-maxT=10+delT
+maxT=100+delT
 nump=maxT/delT
 timearr=np.arange(0,maxT,delT)
 
@@ -153,6 +154,7 @@ q=q+1
 
 # Iterate through each time step using data from the previous step in the trajectory
 while(q < nump-1):
+    print(q)
 
     step_data=array([
         imph3sprot_mesh(new_mesh, new_velocities, delT, masses, sparr, energy_dat[-1], conn_list)
@@ -189,18 +191,18 @@ while(q < nump-1):
 
 
 # Transform into Poincare disk model for plotting
-gut=[]
-gvt=[]
-grt=[]
+# gut=[]
+# gvt=[]
+# grt=[]
 
 
-for i in range(len(gat)):
-    gut.append(sinh(gat[i])*sin(gbt[i])*cos(ggt[i])/(cosh(gat[i]) + 1.))
-    gvt.append(sinh(gat[i])*sin(gbt[i])*sin(ggt[i])/(cosh(gat[i]) + 1.))
-    grt.append(sinh(gat[i])*cos(gbt[i])/(cosh(gat[i]) + 1.))	
+# for i in range(len(gat)):
+#     gut.append(sinh(gat[i])*sin(gbt[i])*cos(ggt[i])/(cosh(gat[i]) + 1.))
+#     gvt.append(sinh(gat[i])*sin(gbt[i])*sin(ggt[i])/(cosh(gat[i]) + 1.))
+#     grt.append(sinh(gat[i])*cos(gbt[i])/(cosh(gat[i]) + 1.))	
 
 # Save the time series data
-np.savetxt("dist1_data.csv",dist)
+#np.savetxt("dist1_data.csv",dist)
 # np.savetxt("dist12_data.csv",dist12) 
 # np.savetxt("dist13_data.csv",dist13) 
 # np.savetxt("dist23_data.csv",dist23)    	     		
